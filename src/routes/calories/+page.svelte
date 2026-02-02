@@ -1,64 +1,541 @@
 <script lang="ts">
-	const today = new Date().toISOString().split('T')[0];
+	import { enhance } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
+	
+	let { data } = $props();
+	
+	// Modal states
+	let showAddFoodModal = $state(false);
+	let showQuickAddModal = $state(false);
+	let showTargetModal = $state(false);
+	
+	// Form states
+	let selectedMealId = $state<number | null>(null);
+	let selectedFoodId = $state<number | null>(null);
+	let selectedServingId = $state<number | null>(null);
+	let quantity = $state(1);
+	let customGrams = $state<number | null>(null);
+	let searchQuery = $state('');
+	
+	// Computed
+	const selectedFood = $derived(data.allFoods.find(f => f.id === selectedFoodId));
+	const filteredFoods = $derived(
+		searchQuery.length > 0
+			? data.allFoods.filter(f => 
+				f.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+				f.brand?.toLowerCase().includes(searchQuery.toLowerCase())
+			)
+			: data.allFoods.slice(0, 20) // Show first 20 by default
+	);
+	
+	// Calculate preview nutrition
+	const previewNutrition = $derived(() => {
+		if (!selectedFood) return null;
+		
+		let grams: number;
+		if (customGrams) {
+			grams = customGrams;
+		} else if (selectedServingId) {
+			const serving = selectedFood.servings.find(s => s.id === selectedServingId);
+			grams = serving ? serving.grams * quantity : 100 * quantity;
+		} else {
+			grams = 100 * quantity;
+		}
+		
+		const multiplier = grams / 100;
+		return {
+			calories: Math.round(selectedFood.calories * multiplier),
+			protein: Math.round(selectedFood.protein * multiplier * 10) / 10,
+			carbs: Math.round(selectedFood.carbs * multiplier * 10) / 10,
+			fat: Math.round(selectedFood.fat * multiplier * 10) / 10
+		};
+	});
+	
+	// Group entries by meal
+	const entriesByMeal = $derived(() => {
+		const grouped = new Map<number | null, typeof data.entries>();
+		for (const meal of data.meals) {
+			grouped.set(meal.id, []);
+		}
+		grouped.set(null, []); // Ungrouped
+		
+		for (const entry of data.entries) {
+			const mealId = entry.mealTypeId;
+			const arr = grouped.get(mealId) ?? [];
+			arr.push(entry);
+			grouped.set(mealId, arr);
+		}
+		return grouped;
+	});
+	
+	// Progress calculations
+	const calorieProgress = $derived(
+		data.target ? Math.min((data.totals.calories / data.target.calories) * 100, 100) : 0
+	);
+	const remaining = $derived(
+		data.target ? data.target.calories - Math.round(data.totals.calories) : 0
+	);
+	
+	function resetAddForm() {
+		selectedFoodId = null;
+		selectedServingId = null;
+		quantity = 1;
+		customGrams = null;
+		searchQuery = '';
+	}
+	
+	function openAddFoodModal(mealId: number | null) {
+		selectedMealId = mealId;
+		resetAddForm();
+		showAddFoodModal = true;
+	}
+	
+	function closeAddFoodModal() {
+		showAddFoodModal = false;
+		resetAddForm();
+	}
 </script>
 
-<div class="space-y-6">
+<div class="space-y-6 pb-4">
 	<header class="flex items-center justify-between">
 		<h1 class="text-2xl font-bold">🍎 Calories</h1>
-		<time class="text-[var(--color-text-muted)] text-sm">{today}</time>
+		<button 
+			onclick={() => showTargetModal = true}
+			class="text-[var(--color-text-muted)] text-sm hover:text-[var(--color-text)]"
+		>
+			{data.date}
+		</button>
 	</header>
 
-	<!-- Daily summary -->
+	<!-- Daily summary card -->
 	<div class="card">
-		<div class="grid grid-cols-4 gap-2 text-center">
+		<div class="grid grid-cols-4 gap-2 text-center mb-4">
 			<div>
-				<div class="text-2xl font-bold">—</div>
+				<div class="text-2xl font-bold">{Math.round(data.totals.calories)}</div>
 				<div class="text-xs text-[var(--color-text-muted)]">Eaten</div>
 			</div>
 			<div>
-				<div class="text-2xl font-bold">—</div>
+				<div class="text-2xl font-bold">{data.target?.calories ?? '—'}</div>
 				<div class="text-xs text-[var(--color-text-muted)]">Target</div>
 			</div>
 			<div>
-				<div class="text-2xl font-bold">—</div>
-				<div class="text-xs text-[var(--color-text-muted)]">Remaining</div>
+				<div class="text-2xl font-bold {remaining < 0 ? 'text-red-400' : 'text-green-400'}">
+					{remaining > 0 ? remaining : Math.abs(remaining)}
+				</div>
+				<div class="text-xs text-[var(--color-text-muted)]">{remaining >= 0 ? 'Left' : 'Over'}</div>
 			</div>
 			<div>
-				<div class="text-2xl font-bold">—g</div>
+				<div class="text-2xl font-bold">{Math.round(data.totals.protein)}g</div>
 				<div class="text-xs text-[var(--color-text-muted)]">Protein</div>
 			</div>
 		</div>
+		
+		<!-- Calorie progress bar -->
+		<div class="h-3 bg-[var(--color-bg)] rounded-full overflow-hidden">
+			<div 
+				class="h-full bg-[var(--color-primary)] rounded-full transition-all duration-300"
+				style="width: {calorieProgress}%"
+			></div>
+		</div>
 	</div>
 
-	<!-- Meals list placeholder -->
+	<!-- Meals list -->
 	<section class="space-y-4">
-		<div class="flex items-center justify-between">
-			<h2 class="text-lg font-semibold">Meals</h2>
-			<button class="btn btn-primary text-sm">+ Add Food</button>
-		</div>
-
-		<div class="card text-center text-[var(--color-text-muted)] py-8">
-			<p class="text-4xl mb-2">🍽️</p>
-			<p>No meals logged today</p>
-			<p class="text-sm mt-1">Tap "Add Food" to get started</p>
-		</div>
+		{#each data.meals as meal}
+			{@const mealEntries = entriesByMeal().get(meal.id) ?? []}
+			{@const mealCalories = mealEntries.reduce((sum, e) => sum + (e.calories || 0), 0)}
+			
+			<div class="card">
+				<div class="flex items-center justify-between mb-3">
+					<h2 class="text-lg font-semibold flex items-center gap-2">
+						<span>{meal.icon}</span>
+						<span>{meal.name}</span>
+						{#if mealCalories > 0}
+							<span class="text-sm text-[var(--color-text-muted)] font-normal">
+								{Math.round(mealCalories)} kcal
+							</span>
+						{/if}
+					</h2>
+					<button 
+						onclick={() => openAddFoodModal(meal.id)}
+						class="btn btn-secondary text-sm px-3 py-1"
+					>
+						+ Add
+					</button>
+				</div>
+				
+				{#if mealEntries.length > 0}
+					<ul class="space-y-2">
+						{#each mealEntries as entry}
+							<li class="flex items-center justify-between py-2 border-b border-[var(--color-surface-hover)] last:border-0">
+								<div class="flex-1 min-w-0">
+									<div class="font-medium truncate">{entry.food.name}</div>
+									<div class="text-sm text-[var(--color-text-muted)]">
+										{entry.serving?.name ?? `${entry.customGrams ?? 100}g`}
+										{#if entry.quantity !== 1}
+											× {entry.quantity}
+										{/if}
+									</div>
+								</div>
+								<div class="flex items-center gap-3">
+									<div class="text-right">
+										<div class="font-medium">{Math.round(entry.calories)} kcal</div>
+										<div class="text-xs text-[var(--color-text-muted)]">
+											P{Math.round(entry.protein)}g
+										</div>
+									</div>
+									<form method="POST" action="?/deleteEntry" use:enhance={() => {
+										return async ({ update }) => {
+											await update();
+										};
+									}}>
+										<input type="hidden" name="entryId" value={entry.id} />
+										<button 
+											type="submit"
+											class="text-red-400 hover:text-red-300 p-1"
+											title="Delete"
+										>
+											×
+										</button>
+									</form>
+								</div>
+							</li>
+						{/each}
+					</ul>
+				{:else}
+					<p class="text-center text-[var(--color-text-muted)] py-4 text-sm">
+						No foods logged
+					</p>
+				{/if}
+			</div>
+		{/each}
 	</section>
 
-	<!-- Macros breakdown placeholder -->
+	<!-- Macros breakdown -->
 	<section class="card">
 		<h2 class="text-lg font-semibold mb-3">Macros</h2>
 		<div class="space-y-3">
-			{#each ['Protein', 'Carbs', 'Fat'] as macro}
+			{#each [
+				{ name: 'Protein', value: data.totals.protein, target: data.target?.protein, color: 'bg-blue-500' },
+				{ name: 'Carbs', value: data.totals.carbs, target: data.target?.carbs, color: 'bg-yellow-500' },
+				{ name: 'Fat', value: data.totals.fat, target: data.target?.fat, color: 'bg-red-400' }
+			] as macro}
+				{@const progress = macro.target ? Math.min((macro.value / macro.target) * 100, 100) : 0}
 				<div>
 					<div class="flex justify-between text-sm mb-1">
-						<span>{macro}</span>
-						<span class="text-[var(--color-text-muted)]">—g / —g</span>
+						<span>{macro.name}</span>
+						<span class="text-[var(--color-text-muted)]">
+							{Math.round(macro.value)}g / {macro.target ?? '—'}g
+						</span>
 					</div>
 					<div class="h-2 bg-[var(--color-bg)] rounded-full overflow-hidden">
-						<div class="h-full bg-[var(--color-primary)] w-0 rounded-full transition-all"></div>
+						<div 
+							class="h-full {macro.color} rounded-full transition-all duration-300"
+							style="width: {progress}%"
+						></div>
 					</div>
 				</div>
 			{/each}
 		</div>
 	</section>
+	
+	<!-- Quick add button (floating) -->
+	<button
+		onclick={() => showQuickAddModal = true}
+		class="fixed bottom-20 right-4 w-14 h-14 bg-[var(--color-primary)] rounded-full shadow-lg flex items-center justify-center text-2xl hover:bg-[var(--color-primary-dark)] transition-colors"
+		title="Quick add food"
+	>
+		+
+	</button>
 </div>
+
+<!-- Add Food Modal -->
+{#if showAddFoodModal}
+	<div class="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
+		<div class="bg-[var(--color-surface)] w-full max-w-lg rounded-t-2xl sm:rounded-2xl max-h-[85vh] flex flex-col">
+			<div class="p-4 border-b border-[var(--color-surface-hover)] flex items-center justify-between">
+				<h3 class="text-lg font-semibold">Add Food</h3>
+				<button onclick={closeAddFoodModal} class="text-2xl">×</button>
+			</div>
+			
+			<div class="p-4 flex-1 overflow-y-auto space-y-4">
+				<!-- Search -->
+				<input
+					type="text"
+					placeholder="Search foods..."
+					bind:value={searchQuery}
+					class="input"
+				/>
+				
+				{#if !selectedFoodId}
+					<!-- Food list -->
+					<ul class="space-y-2 max-h-60 overflow-y-auto">
+						{#each filteredFoods as food}
+							<li>
+								<button
+									onclick={() => {
+										selectedFoodId = food.id;
+										if (food.servings.length > 0) {
+											const defaultServing = food.servings.find(s => s.isDefault) ?? food.servings[0];
+											selectedServingId = defaultServing.id;
+										}
+									}}
+									class="w-full text-left p-3 rounded-lg bg-[var(--color-bg)] hover:bg-[var(--color-surface-hover)] transition-colors"
+								>
+									<div class="font-medium">{food.name}</div>
+									<div class="text-sm text-[var(--color-text-muted)]">
+										{food.calories} kcal / 100g • P{food.protein}g C{food.carbs}g F{food.fat}g
+									</div>
+								</button>
+							</li>
+						{/each}
+					</ul>
+					
+					{#if filteredFoods.length === 0}
+						<p class="text-center text-[var(--color-text-muted)] py-4">
+							No foods found. Try a different search or create a new food.
+						</p>
+					{/if}
+				{:else if selectedFood}
+					<!-- Selected food details -->
+					<div class="p-3 rounded-lg bg-[var(--color-bg)]">
+						<div class="flex justify-between items-start">
+							<div>
+								<div class="font-semibold">{selectedFood.name}</div>
+								<div class="text-sm text-[var(--color-text-muted)]">
+									{selectedFood.calories} kcal / 100g
+								</div>
+							</div>
+							<button 
+								onclick={() => { selectedFoodId = null; selectedServingId = null; }}
+								class="text-[var(--color-primary)]"
+							>
+								Change
+							</button>
+						</div>
+					</div>
+					
+					<!-- Serving size -->
+					{#if selectedFood.servings.length > 0}
+						<div>
+							<label class="block text-sm mb-2">Serving size</label>
+							<select 
+								bind:value={selectedServingId}
+								onchange={() => customGrams = null}
+								class="input"
+							>
+								{#each selectedFood.servings as serving}
+									<option value={serving.id}>
+										{serving.name} ({serving.grams}g)
+									</option>
+								{/each}
+								<option value={null}>Custom (grams)</option>
+							</select>
+						</div>
+					{/if}
+					
+					<!-- Quantity or custom grams -->
+					{#if selectedServingId || selectedFood.servings.length === 0}
+						<div>
+							<label class="block text-sm mb-2">Quantity</label>
+							<input
+								type="number"
+								bind:value={quantity}
+								min="0.1"
+								step="0.1"
+								class="input"
+							/>
+						</div>
+					{:else}
+						<div>
+							<label class="block text-sm mb-2">Amount (grams)</label>
+							<input
+								type="number"
+								bind:value={customGrams}
+								min="1"
+								step="1"
+								placeholder="e.g., 150"
+								class="input"
+							/>
+						</div>
+					{/if}
+					
+					<!-- Preview -->
+					{#if previewNutrition()}
+						{@const preview = previewNutrition()}
+						<div class="p-3 rounded-lg bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/30">
+							<div class="text-sm text-[var(--color-text-muted)] mb-1">This will add:</div>
+							<div class="font-bold text-lg">{preview?.calories} kcal</div>
+							<div class="text-sm text-[var(--color-text-muted)]">
+								P{preview?.protein}g • C{preview?.carbs}g • F{preview?.fat}g
+							</div>
+						</div>
+					{/if}
+				{/if}
+			</div>
+			
+			{#if selectedFoodId}
+				<div class="p-4 border-t border-[var(--color-surface-hover)]">
+					<form 
+						method="POST" 
+						action="?/addEntry"
+						use:enhance={() => {
+							return async ({ update }) => {
+								await update();
+								closeAddFoodModal();
+							};
+						}}
+					>
+						<input type="hidden" name="date" value={data.date} />
+						<input type="hidden" name="foodId" value={selectedFoodId} />
+						<input type="hidden" name="mealTypeId" value={selectedMealId ?? ''} />
+						<input type="hidden" name="servingId" value={selectedServingId ?? ''} />
+						<input type="hidden" name="quantity" value={quantity} />
+						{#if customGrams}
+							<input type="hidden" name="customGrams" value={customGrams} />
+						{/if}
+						<button type="submit" class="btn btn-primary w-full">
+							Add to {data.meals.find(m => m.id === selectedMealId)?.name ?? 'Log'}
+						</button>
+					</form>
+				</div>
+			{/if}
+		</div>
+	</div>
+{/if}
+
+<!-- Quick Add Food Modal -->
+{#if showQuickAddModal}
+	<div class="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
+		<div class="bg-[var(--color-surface)] w-full max-w-lg rounded-t-2xl sm:rounded-2xl">
+			<div class="p-4 border-b border-[var(--color-surface-hover)] flex items-center justify-between">
+				<h3 class="text-lg font-semibold">Quick Add Food</h3>
+				<button onclick={() => showQuickAddModal = false} class="text-2xl">×</button>
+			</div>
+			
+			<form 
+				method="POST" 
+				action="?/quickAddFood"
+				use:enhance={() => {
+					return async ({ update, result }) => {
+						await update();
+						if (result.type === 'success') {
+							showQuickAddModal = false;
+						}
+					};
+				}}
+				class="p-4 space-y-4"
+			>
+				<div>
+					<label class="block text-sm mb-2">Food name *</label>
+					<input type="text" name="name" required class="input" placeholder="e.g., Chicken breast" />
+				</div>
+				
+				<div class="grid grid-cols-2 gap-4">
+					<div>
+						<label class="block text-sm mb-2">Calories (per 100g) *</label>
+						<input type="number" name="calories" required min="0" class="input" placeholder="e.g., 165" />
+					</div>
+					<div>
+						<label class="block text-sm mb-2">Protein (g)</label>
+						<input type="number" name="protein" min="0" step="0.1" class="input" placeholder="e.g., 31" />
+					</div>
+				</div>
+				
+				<div class="grid grid-cols-2 gap-4">
+					<div>
+						<label class="block text-sm mb-2">Carbs (g)</label>
+						<input type="number" name="carbs" min="0" step="0.1" class="input" placeholder="e.g., 0" />
+					</div>
+					<div>
+						<label class="block text-sm mb-2">Fat (g)</label>
+						<input type="number" name="fat" min="0" step="0.1" class="input" placeholder="e.g., 3.6" />
+					</div>
+				</div>
+				
+				<p class="text-xs text-[var(--color-text-muted)]">
+					All values are per 100g. The food will be saved and can be reused.
+				</p>
+				
+				<button type="submit" class="btn btn-primary w-full">
+					Create Food
+				</button>
+			</form>
+		</div>
+	</div>
+{/if}
+
+<!-- Target Edit Modal -->
+{#if showTargetModal}
+	<div class="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
+		<div class="bg-[var(--color-surface)] w-full max-w-lg rounded-t-2xl sm:rounded-2xl">
+			<div class="p-4 border-b border-[var(--color-surface-hover)] flex items-center justify-between">
+				<h3 class="text-lg font-semibold">Daily Targets</h3>
+				<button onclick={() => showTargetModal = false} class="text-2xl">×</button>
+			</div>
+			
+			<form 
+				method="POST" 
+				action="?/updateTarget"
+				use:enhance={() => {
+					return async ({ update }) => {
+						await update();
+						showTargetModal = false;
+					};
+				}}
+				class="p-4 space-y-4"
+			>
+				<input type="hidden" name="date" value={data.date} />
+				
+				<div>
+					<label class="block text-sm mb-2">Calories</label>
+					<input 
+						type="number" 
+						name="calories" 
+						value={data.target?.calories ?? 2500} 
+						min="1000" 
+						max="10000"
+						class="input" 
+					/>
+				</div>
+				
+				<div class="grid grid-cols-3 gap-4">
+					<div>
+						<label class="block text-sm mb-2">Protein (g)</label>
+						<input 
+							type="number" 
+							name="protein" 
+							value={data.target?.protein ?? 180} 
+							min="0"
+							class="input" 
+						/>
+					</div>
+					<div>
+						<label class="block text-sm mb-2">Carbs (g)</label>
+						<input 
+							type="number" 
+							name="carbs" 
+							value={data.target?.carbs ?? 280} 
+							min="0"
+							class="input" 
+						/>
+					</div>
+					<div>
+						<label class="block text-sm mb-2">Fat (g)</label>
+						<input 
+							type="number" 
+							name="fat" 
+							value={data.target?.fat ?? 80} 
+							min="0"
+							class="input" 
+						/>
+					</div>
+				</div>
+				
+				<button type="submit" class="btn btn-primary w-full">
+					Save Targets
+				</button>
+			</form>
+		</div>
+	</div>
+{/if}
