@@ -129,7 +129,8 @@
 		showSupplementDetailModal = true;
 	}
 	
-	function openAddSchedule(supp: typeof data.allSupplements[0]) {
+	function openAddSchedule(supp: typeof data.allSupplements[0] | null) {
+		if (!supp) return;
 		selectedSupplement = supp;
 		resetScheduleForm();
 		showAddScheduleModal = true;
