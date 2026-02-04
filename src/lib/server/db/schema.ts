@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { relations } from 'drizzle-orm';
 
 // ============================================================================
@@ -16,43 +16,57 @@ export const appSettings = sqliteTable('app_settings', {
 // ============================================================================
 
 // Custom foods database (+ OpenFoodFacts cache)
-export const foods = sqliteTable('foods', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
-	name: text('name').notNull(),
-	brand: text('brand'),
-	barcode: text('barcode'), // EAN/UPC for OpenFoodFacts lookup
-	source: text('source').default('custom'), // 'custom' | 'openfoodfacts'
-	// Per 100g/ml base values
-	calories: real('calories').notNull(), // kcal
-	protein: real('protein').notNull(), // g
-	carbs: real('carbs').notNull(), // g
-	fat: real('fat').notNull(), // g
-	fiber: real('fiber'), // g
-	sugar: real('sugar'), // g
-	sodium: real('sodium'), // mg
-	// Additional micros (optional)
-	saturatedFat: real('saturated_fat'), // g
-	transFat: real('trans_fat'), // g
-	cholesterol: real('cholesterol'), // mg
-	potassium: real('potassium'), // mg
-	vitaminA: real('vitamin_a'), // IU
-	vitaminC: real('vitamin_c'), // mg
-	calcium: real('calcium'), // mg
-	iron: real('iron'), // mg
-	// Metadata
-	isLiquid: integer('is_liquid', { mode: 'boolean' }).default(false),
-	createdAt: text('created_at').notNull(),
-	updatedAt: text('updated_at').notNull()
-});
+export const foods = sqliteTable(
+	'foods',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		name: text('name').notNull(),
+		brand: text('brand'),
+		barcode: text('barcode'), // EAN/UPC for OpenFoodFacts lookup
+		source: text('source').default('custom'), // 'custom' | 'openfoodfacts'
+		// Per 100g/ml base values
+		calories: real('calories').notNull(), // kcal
+		protein: real('protein').notNull(), // g
+		carbs: real('carbs').notNull(), // g
+		fat: real('fat').notNull(), // g
+		fiber: real('fiber'), // g
+		sugar: real('sugar'), // g
+		sodium: real('sodium'), // mg
+		// Additional micros (optional)
+		saturatedFat: real('saturated_fat'), // g
+		transFat: real('trans_fat'), // g
+		cholesterol: real('cholesterol'), // mg
+		potassium: real('potassium'), // mg
+		vitaminA: real('vitamin_a'), // IU
+		vitaminC: real('vitamin_c'), // mg
+		calcium: real('calcium'), // mg
+		iron: real('iron'), // mg
+		// Metadata
+		isLiquid: integer('is_liquid', { mode: 'boolean' }).default(false),
+		createdAt: text('created_at').notNull(),
+		updatedAt: text('updated_at').notNull()
+	},
+	(table) => ({
+		barcodeUnique: uniqueIndex('foods_barcode_unique').on(table.barcode),
+		nameBrandIdx: index('foods_name_brand_idx').on(table.name, table.brand)
+	})
+);
 
 // Serving sizes for foods
-export const foodServings = sqliteTable('food_servings', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
-	foodId: integer('food_id').notNull().references(() => foods.id, { onDelete: 'cascade' }),
-	name: text('name').notNull(), // e.g., "1 cup", "1 slice", "1 scoop"
-	grams: real('grams').notNull(), // weight in grams
-	isDefault: integer('is_default', { mode: 'boolean' }).default(false)
-});
+export const foodServings = sqliteTable(
+	'food_servings',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		foodId: integer('food_id').notNull().references(() => foods.id, { onDelete: 'cascade' }),
+		name: text('name').notNull(), // e.g., "1 cup", "1 slice", "1 scoop"
+		grams: real('grams').notNull(), // weight in grams
+		isDefault: integer('is_default', { mode: 'boolean' }).default(false)
+	},
+	(table) => ({
+		foodIdx: index('food_servings_food_id_idx').on(table.foodId),
+		foodNameUnique: uniqueIndex('food_servings_food_id_name_unique').on(table.foodId, table.name)
+	})
+);
 
 // Daily calorie/macro targets
 export const dailyTargets = sqliteTable('daily_targets', {
@@ -69,32 +83,45 @@ export const dailyTargets = sqliteTable('daily_targets', {
 });
 
 // Meal types
-export const mealTypes = sqliteTable('meal_types', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
-	name: text('name').notNull(), // e.g., "Breakfast", "Lunch", "Dinner", "Snack"
-	sortOrder: integer('sort_order').default(0),
-	icon: text('icon') // emoji
-});
+export const mealTypes = sqliteTable(
+	'meal_types',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		name: text('name').notNull(), // e.g., "Breakfast", "Lunch", "Dinner", "Snack"
+		sortOrder: integer('sort_order').default(0),
+		icon: text('icon') // emoji
+	},
+	(table) => ({
+		nameUnique: uniqueIndex('meal_types_name_unique').on(table.name)
+	})
+);
 
 // Food log entries
-export const foodEntries = sqliteTable('food_entries', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
-	date: text('date').notNull(), // ISO date
-	mealTypeId: integer('meal_type_id').references(() => mealTypes.id),
-	foodId: integer('food_id').notNull().references(() => foods.id),
-	servingId: integer('serving_id').references(() => foodServings.id),
-	// Amount consumed
-	quantity: real('quantity').notNull().default(1), // number of servings
-	customGrams: real('custom_grams'), // override if not using a serving
-	// Calculated values at time of entry (for historical accuracy)
-	calories: real('calories').notNull(),
-	protein: real('protein').notNull(),
-	carbs: real('carbs').notNull(),
-	fat: real('fat').notNull(),
-	// Timestamps
-	loggedAt: text('logged_at').notNull(),
-	createdAt: text('created_at').notNull()
-});
+export const foodEntries = sqliteTable(
+	'food_entries',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		date: text('date').notNull(), // ISO date
+		mealTypeId: integer('meal_type_id').references(() => mealTypes.id),
+		foodId: integer('food_id').notNull().references(() => foods.id),
+		servingId: integer('serving_id').references(() => foodServings.id),
+		// Amount consumed
+		quantity: real('quantity').notNull().default(1), // number of servings
+		customGrams: real('custom_grams'), // override if not using a serving
+		// Calculated values at time of entry (for historical accuracy)
+		calories: real('calories').notNull(),
+		protein: real('protein').notNull(),
+		carbs: real('carbs').notNull(),
+		fat: real('fat').notNull(),
+		// Timestamps
+		loggedAt: text('logged_at').notNull(),
+		createdAt: text('created_at').notNull()
+	},
+	(table) => ({
+		dateIdx: index('food_entries_date_idx').on(table.date),
+		dateMealIdx: index('food_entries_date_meal_idx').on(table.date, table.mealTypeId)
+	})
+);
 
 // ============================================================================
 // TRAINING TRACKER
@@ -157,19 +184,30 @@ export const workouts = sqliteTable('workouts', {
 });
 
 // Individual sets in a workout
-export const workoutSets = sqliteTable('workout_sets', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
-	workoutId: integer('workout_id').notNull().references(() => workouts.id, { onDelete: 'cascade' }),
-	exerciseId: integer('exercise_id').notNull().references(() => exercises.id),
-	setNumber: integer('set_number').notNull(),
-	setType: text('set_type').default('working'), // 'warmup' | 'working' | 'dropset' | 'failure'
-	weight: real('weight'), // kg or lbs (user preference)
-	reps: integer('reps'),
-	rpe: real('rpe'), // Rate of Perceived Exertion 1-10
-	isCompleted: integer('is_completed', { mode: 'boolean' }).default(false),
-	notes: text('notes'),
-	completedAt: text('completed_at')
-});
+export const workoutSets = sqliteTable(
+	'workout_sets',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		workoutId: integer('workout_id').notNull().references(() => workouts.id, { onDelete: 'cascade' }),
+		exerciseId: integer('exercise_id').notNull().references(() => exercises.id),
+		setNumber: integer('set_number').notNull(),
+		setType: text('set_type').default('working'), // 'warmup' | 'working' | 'dropset' | 'failure'
+		weight: real('weight'), // kg or lbs (user preference)
+		reps: integer('reps'),
+		rpe: real('rpe'), // Rate of Perceived Exertion 1-10
+		isCompleted: integer('is_completed', { mode: 'boolean' }).default(false),
+		notes: text('notes'),
+		completedAt: text('completed_at')
+	},
+	(table) => ({
+		workoutIdx: index('workout_sets_workout_id_idx').on(table.workoutId),
+		workoutExerciseSetUnique: uniqueIndex('workout_sets_workout_exercise_set_unique').on(
+			table.workoutId,
+			table.exerciseId,
+			table.setNumber
+		)
+	})
+);
 
 // Personal records
 export const personalRecords = sqliteTable('personal_records', {
@@ -260,13 +298,19 @@ export const bodyWeights = sqliteTable('body_weights', {
 });
 
 // Measurement types
-export const measurementTypes = sqliteTable('measurement_types', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
-	name: text('name').notNull(), // e.g., "Chest", "Waist", "Biceps (L)", "Biceps (R)"
-	unit: text('unit').default('cm'), // 'cm' | 'inches'
-	sortOrder: integer('sort_order').default(0),
-	icon: text('icon') // emoji
-});
+export const measurementTypes = sqliteTable(
+	'measurement_types',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		name: text('name').notNull(), // e.g., "Chest", "Waist", "Biceps (L)", "Biceps (R)"
+		unit: text('unit').default('cm'), // 'cm' | 'inches'
+		sortOrder: integer('sort_order').default(0),
+		icon: text('icon') // emoji
+	},
+	(table) => ({
+		nameUnique: uniqueIndex('measurement_types_name_unique').on(table.name)
+	})
+);
 
 // Body measurements
 export const bodyMeasurements = sqliteTable('body_measurements', {
