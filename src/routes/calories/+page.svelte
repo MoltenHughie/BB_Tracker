@@ -318,8 +318,10 @@
 					<!-- Serving size -->
 					{#if selectedFood.servings.length > 0}
 						<div>
-							<label class="block text-sm mb-2">Serving size</label>
+							<label for="servingId" class="block text-sm mb-2">Serving size</label>
 							<select 
+								id="servingId"
+								name="servingId"
 								bind:value={selectedServingId}
 								onchange={() => customGrams = null}
 								class="input"
@@ -337,8 +339,10 @@
 					<!-- Quantity or custom grams -->
 					{#if selectedServingId || selectedFood.servings.length === 0}
 						<div>
-							<label class="block text-sm mb-2">Quantity</label>
+							<label for="quantity" class="block text-sm mb-2">Quantity</label>
 							<input
+								id="quantity"
+								name="quantity"
 								type="number"
 								bind:value={quantity}
 								min="0.1"
@@ -348,8 +352,10 @@
 						</div>
 					{:else}
 						<div>
-							<label class="block text-sm mb-2">Amount (grams)</label>
+							<label for="customGrams" class="block text-sm mb-2">Amount (grams)</label>
 							<input
+								id="customGrams"
+								name="customGrams"
 								type="number"
 								bind:value={customGrams}
 								min="1"
@@ -427,29 +433,29 @@
 				class="p-4 space-y-4"
 			>
 				<div>
-					<label class="block text-sm mb-2">Food name *</label>
-					<input type="text" name="name" required class="input" placeholder="e.g., Chicken breast" />
+					<label for="quick_name" class="block text-sm mb-2">Food name *</label>
+					<input id="quick_name" type="text" name="name" required class="input" placeholder="e.g., Chicken breast" />
 				</div>
 				
 				<div class="grid grid-cols-2 gap-4">
 					<div>
-						<label class="block text-sm mb-2">Calories (per 100g) *</label>
-						<input type="number" name="calories" required min="0" class="input" placeholder="e.g., 165" />
+						<label for="quick_calories" class="block text-sm mb-2">Calories (per 100g) *</label>
+						<input id="quick_calories" type="number" name="calories" required min="0" class="input" placeholder="e.g., 165" />
 					</div>
 					<div>
-						<label class="block text-sm mb-2">Protein (g)</label>
-						<input type="number" name="protein" min="0" step="0.1" class="input" placeholder="e.g., 31" />
+						<label for="quick_protein" class="block text-sm mb-2">Protein (g)</label>
+						<input id="quick_protein" type="number" name="protein" min="0" step="0.1" class="input" placeholder="e.g., 31" />
 					</div>
 				</div>
 				
 				<div class="grid grid-cols-2 gap-4">
 					<div>
-						<label class="block text-sm mb-2">Carbs (g)</label>
-						<input type="number" name="carbs" min="0" step="0.1" class="input" placeholder="e.g., 0" />
+						<label for="quick_carbs" class="block text-sm mb-2">Carbs (g)</label>
+						<input id="quick_carbs" type="number" name="carbs" min="0" step="0.1" class="input" placeholder="e.g., 0" />
 					</div>
 					<div>
-						<label class="block text-sm mb-2">Fat (g)</label>
-						<input type="number" name="fat" min="0" step="0.1" class="input" placeholder="e.g., 3.6" />
+						<label for="quick_fat" class="block text-sm mb-2">Fat (g)</label>
+						<input id="quick_fat" type="number" name="fat" min="0" step="0.1" class="input" placeholder="e.g., 3.6" />
 					</div>
 				</div>
 				
@@ -488,8 +494,9 @@
 				<input type="hidden" name="date" value={data.date} />
 				
 				<div>
-					<label class="block text-sm mb-2">Calories</label>
+					<label for="target_calories" class="block text-sm mb-2">Calories</label>
 					<input 
+						id="target_calories"
 						type="number" 
 						name="calories" 
 						value={data.target?.calories ?? 2500} 
@@ -501,8 +508,9 @@
 				
 				<div class="grid grid-cols-3 gap-4">
 					<div>
-						<label class="block text-sm mb-2">Protein (g)</label>
+						<label for="target_protein" class="block text-sm mb-2">Protein (g)</label>
 						<input 
+							id="target_protein"
 							type="number" 
 							name="protein" 
 							value={data.target?.protein ?? 180} 
@@ -511,8 +519,9 @@
 						/>
 					</div>
 					<div>
-						<label class="block text-sm mb-2">Carbs (g)</label>
+						<label for="target_carbs" class="block text-sm mb-2">Carbs (g)</label>
 						<input 
+							id="target_carbs"
 							type="number" 
 							name="carbs" 
 							value={data.target?.carbs ?? 280} 
@@ -521,8 +530,9 @@
 						/>
 					</div>
 					<div>
-						<label class="block text-sm mb-2">Fat (g)</label>
+						<label for="target_fat" class="block text-sm mb-2">Fat (g)</label>
 						<input 
+							id="target_fat"
 							type="number" 
 							name="fat" 
 							value={data.target?.fat ?? 80} 
