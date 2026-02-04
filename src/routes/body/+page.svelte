@@ -14,7 +14,7 @@
 	let activeTab = $state<'weight' | 'measurements' | 'composition'>('weight');
 	
 	// Form states
-	let weightValue = $state<number | null>(data.latestWeight?.weight ?? null);
+	let weightValue = $state<number | null>(null);
 	let weightTime = $state('');
 	let weightCondition = $state('');
 	let weightNotes = $state('');
@@ -22,11 +22,25 @@
 	let selectedMeasureType = $state<number | null>(null);
 	let measureValue = $state<number | null>(null);
 	
-	let compBodyFat = $state<number | null>(data.latestComposition?.bodyFatPercent ?? null);
-	let compMuscleMass = $state<number | null>(data.latestComposition?.muscleMassKg ?? null);
+	let compBodyFat = $state<number | null>(null);
+	let compMuscleMass = $state<number | null>(null);
 	let compBoneMass = $state<number | null>(null);
 	let compWater = $state<number | null>(null);
 	let compMethod = $state('scale');
+
+	// Keep defaults in sync with loaded data (but don't clobber user edits while modals are open)
+	$effect(() => {
+		if (!showWeightModal) {
+			weightValue = data.latestWeight?.weight ?? null;
+		}
+	});
+
+	$effect(() => {
+		if (!showCompositionModal) {
+			compBodyFat = data.latestComposition?.bodyFatPercent ?? null;
+			compMuscleMass = data.latestComposition?.muscleMassKg ?? null;
+		}
+	});
 	
 	// Computed
 	const weightChange = $derived(() => {
@@ -419,8 +433,9 @@
 				<input type="hidden" name="date" value={data.date} />
 				
 				<div>
-					<label class="block text-sm mb-2">Weight (kg) *</label>
+					<label for="weight" class="block text-sm mb-2">Weight (kg) *</label>
 					<input 
+						id="weight"
 						type="number" 
 						name="weight" 
 						bind:value={weightValue}
@@ -435,8 +450,9 @@
 				
 				<div class="grid grid-cols-2 gap-4">
 					<div>
-						<label class="block text-sm mb-2">Time</label>
+						<label for="weight-time" class="block text-sm mb-2">Time</label>
 						<input 
+							id="weight-time"
 							type="time" 
 							name="time" 
 							bind:value={weightTime}
@@ -444,8 +460,8 @@
 						/>
 					</div>
 					<div>
-						<label class="block text-sm mb-2">Condition</label>
-						<select name="condition" bind:value={weightCondition} class="input">
+						<label for="weight-condition" class="block text-sm mb-2">Condition</label>
+						<select id="weight-condition" name="condition" bind:value={weightCondition} class="input">
 							<option value="">Select...</option>
 							<option value="fasted">Fasted (morning)</option>
 							<option value="post_meal">Post-meal</option>
@@ -455,8 +471,9 @@
 				</div>
 				
 				<div>
-					<label class="block text-sm mb-2">Notes</label>
+					<label for="weight-notes" class="block text-sm mb-2">Notes</label>
 					<input 
+						id="weight-notes"
 						type="text" 
 						name="notes" 
 						bind:value={weightNotes}
@@ -497,8 +514,9 @@
 				<input type="hidden" name="date" value={data.date} />
 				
 				<div>
-					<label class="block text-sm mb-2">Measurement Type *</label>
+					<label for="measurement-type" class="block text-sm mb-2">Measurement Type *</label>
 					<select 
+						id="measurement-type"
 						name="measurementTypeId" 
 						bind:value={selectedMeasureType}
 						required
@@ -514,7 +532,7 @@
 				</div>
 				
 				<div>
-					<label class="block text-sm mb-2">
+					<label for="measurement-value" class="block text-sm mb-2">
 						Value 
 						{#if selectedMeasureType}
 							({data.measureTypes.find(t => t.id === selectedMeasureType)?.unit ?? 'cm'})
@@ -522,6 +540,7 @@
 						*
 					</label>
 					<input 
+						id="measurement-value"
 						type="number" 
 						name="value" 
 						bind:value={measureValue}
@@ -562,8 +581,9 @@
 				class="p-4 space-y-4"
 			>
 				<div>
-					<label class="block text-sm mb-2">Name *</label>
+					<label for="measurement-type-name" class="block text-sm mb-2">Name *</label>
 					<input 
+						id="measurement-type-name"
 						type="text" 
 						name="name" 
 						required
@@ -574,15 +594,16 @@
 				
 				<div class="grid grid-cols-2 gap-4">
 					<div>
-						<label class="block text-sm mb-2">Unit</label>
-						<select name="unit" class="input">
+						<label for="measurement-type-unit" class="block text-sm mb-2">Unit</label>
+						<select id="measurement-type-unit" name="unit" class="input">
 							<option value="cm">cm</option>
 							<option value="inches">inches</option>
 						</select>
 					</div>
 					<div>
-						<label class="block text-sm mb-2">Icon (emoji)</label>
+						<label for="measurement-type-icon" class="block text-sm mb-2">Icon (emoji)</label>
 						<input 
+							id="measurement-type-icon"
 							type="text" 
 							name="icon" 
 							class="input"
@@ -624,8 +645,9 @@
 				
 				<div class="grid grid-cols-2 gap-4">
 					<div>
-						<label class="block text-sm mb-2">Body Fat %</label>
+						<label for="comp-bodyfat" class="block text-sm mb-2">Body Fat %</label>
 						<input 
+							id="comp-bodyfat"
 							type="number" 
 							name="bodyFatPercent" 
 							bind:value={compBodyFat}
@@ -637,8 +659,9 @@
 						/>
 					</div>
 					<div>
-						<label class="block text-sm mb-2">Muscle Mass (kg)</label>
+						<label for="comp-muscle" class="block text-sm mb-2">Muscle Mass (kg)</label>
 						<input 
+							id="comp-muscle"
 							type="number" 
 							name="muscleMassKg" 
 							bind:value={compMuscleMass}
@@ -653,8 +676,9 @@
 				
 				<div class="grid grid-cols-2 gap-4">
 					<div>
-						<label class="block text-sm mb-2">Water %</label>
+						<label for="comp-water" class="block text-sm mb-2">Water %</label>
 						<input 
+							id="comp-water"
 							type="number" 
 							name="waterPercent" 
 							bind:value={compWater}
@@ -666,8 +690,9 @@
 						/>
 					</div>
 					<div>
-						<label class="block text-sm mb-2">Bone Mass (kg)</label>
+						<label for="comp-bone" class="block text-sm mb-2">Bone Mass (kg)</label>
 						<input 
+							id="comp-bone"
 							type="number" 
 							name="boneMassKg" 
 							bind:value={compBoneMass}
@@ -681,8 +706,8 @@
 				</div>
 				
 				<div>
-					<label class="block text-sm mb-2">Measurement Method</label>
-					<select name="method" bind:value={compMethod} class="input">
+					<label for="comp-method" class="block text-sm mb-2">Measurement Method</label>
+					<select id="comp-method" name="method" bind:value={compMethod} class="input">
 						<option value="scale">Smart Scale</option>
 						<option value="caliper">Skinfold Calipers</option>
 						<option value="dexa">DEXA Scan</option>

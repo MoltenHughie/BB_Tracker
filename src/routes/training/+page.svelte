@@ -290,8 +290,9 @@
 					<!-- Weight/Reps/RPE inputs -->
 					<div class="grid grid-cols-3 gap-3">
 						<div>
-							<label class="block text-xs text-[var(--color-text-muted)] mb-1">Weight (kg)</label>
+							<label for="set-weight" class="block text-xs text-[var(--color-text-muted)] mb-1">Weight (kg)</label>
 							<input 
+								id="set-weight"
 								type="number" 
 								name="weight"
 								bind:value={newWeight}
@@ -302,8 +303,9 @@
 							/>
 						</div>
 						<div>
-							<label class="block text-xs text-[var(--color-text-muted)] mb-1">Reps</label>
+							<label for="set-reps" class="block text-xs text-[var(--color-text-muted)] mb-1">Reps</label>
 							<input 
+								id="set-reps"
 								type="number" 
 								name="reps"
 								bind:value={newReps}
@@ -313,8 +315,9 @@
 							/>
 						</div>
 						<div>
-							<label class="block text-xs text-[var(--color-text-muted)] mb-1">RPE</label>
+							<label for="set-rpe" class="block text-xs text-[var(--color-text-muted)] mb-1">RPE</label>
 							<input 
+								id="set-rpe"
 								type="number" 
 								name="rpe"
 								bind:value={newRpe}
@@ -577,8 +580,8 @@
 				</div>
 				
 				<div>
-					<label class="block text-sm mb-2">How was it? (optional)</label>
-					<div class="flex justify-center gap-2">
+					<div class="block text-sm mb-2">How was it? (optional)</div>
+					<div class="flex justify-center gap-2" role="group" aria-label="Workout rating">
 						{#each [1, 2, 3, 4, 5] as star}
 							<button
 								type="button"
@@ -602,8 +605,8 @@
 				</div>
 				
 				<div>
-					<label class="block text-sm mb-2">Notes (optional)</label>
-					<textarea name="notes" class="input h-20 resize-none" placeholder="How did it feel?"></textarea>
+					<label for="finish-notes" class="block text-sm mb-2">Notes (optional)</label>
+					<textarea id="finish-notes" name="notes" class="input h-20 resize-none" placeholder="How did it feel?"></textarea>
 				</div>
 				
 				<button type="submit" class="btn btn-primary w-full">

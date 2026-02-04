@@ -405,8 +405,9 @@
 				class="p-4 space-y-4 overflow-y-auto"
 			>
 				<div>
-					<label class="block text-sm mb-2">Name *</label>
+					<label for="supp-name" class="block text-sm mb-2">Name *</label>
 					<input 
+						id="supp-name"
 						type="text" 
 						name="name" 
 						bind:value={newName}
@@ -418,8 +419,9 @@
 				
 				<div class="grid grid-cols-2 gap-4">
 					<div>
-						<label class="block text-sm mb-2">Brand</label>
+						<label for="supp-brand" class="block text-sm mb-2">Brand</label>
 						<input 
+							id="supp-brand"
 							type="text" 
 							name="brand" 
 							bind:value={newBrand}
@@ -428,8 +430,8 @@
 						/>
 					</div>
 					<div>
-						<label class="block text-sm mb-2">Category</label>
-						<select name="category" bind:value={newCategory} class="input">
+						<label for="supp-category" class="block text-sm mb-2">Category</label>
+						<select id="supp-category" name="category" bind:value={newCategory} class="input">
 							<option value="">Select...</option>
 							<option value="vitamin">Vitamin</option>
 							<option value="mineral">Mineral</option>
@@ -444,8 +446,8 @@
 				
 				<div class="grid grid-cols-2 gap-4">
 					<div>
-						<label class="block text-sm mb-2">Form</label>
-						<select name="form" bind:value={newForm} class="input">
+						<label for="supp-form" class="block text-sm mb-2">Form</label>
+						<select id="supp-form" name="form" bind:value={newForm} class="input">
 							<option value="">Select...</option>
 							<option value="pill">Pill</option>
 							<option value="capsule">Capsule</option>
@@ -455,8 +457,9 @@
 						</select>
 					</div>
 					<div>
-						<label class="block text-sm mb-2">Serving Size</label>
+						<label for="supp-serving" class="block text-sm mb-2">Serving Size</label>
 						<input 
+							id="supp-serving"
 							type="text" 
 							name="servingSize" 
 							bind:value={newServingSize}
@@ -467,8 +470,9 @@
 				</div>
 				
 				<div>
-					<label class="block text-sm mb-2">Concentration (for injectables)</label>
+					<label for="supp-concentration" class="block text-sm mb-2">Concentration (for injectables)</label>
 					<input 
+						id="supp-concentration"
 						type="text" 
 						name="concentration" 
 						bind:value={newConcentration}
@@ -501,8 +505,9 @@
 				</div>
 				
 				<div>
-					<label class="block text-sm mb-2">Notes</label>
+					<label for="supp-notes" class="block text-sm mb-2">Notes</label>
 					<textarea 
+						id="supp-notes"
 						name="notes" 
 						bind:value={newNotes}
 						class="input h-20 resize-none" 
@@ -693,8 +698,8 @@
 				
 				<div class="grid grid-cols-2 gap-4">
 					<div>
-						<label class="block text-sm mb-2">Time of Day</label>
-						<select name="timeOfDay" bind:value={schedTimeOfDay} class="input">
+						<label for="sched-time-of-day" class="block text-sm mb-2">Time of Day</label>
+						<select id="sched-time-of-day" name="timeOfDay" bind:value={schedTimeOfDay} class="input">
 							<option value="morning">Morning</option>
 							<option value="noon">Midday</option>
 							<option value="preworkout">Pre-Workout</option>
@@ -704,8 +709,9 @@
 						</select>
 					</div>
 					<div>
-						<label class="block text-sm mb-2">Specific Time (optional)</label>
+						<label for="sched-specific-time" class="block text-sm mb-2">Specific Time (optional)</label>
 						<input 
+							id="sched-specific-time"
 							type="time" 
 							name="scheduledTime" 
 							bind:value={schedTime}
@@ -715,8 +721,9 @@
 				</div>
 				
 				<div>
-					<label class="block text-sm mb-2">Dose</label>
+					<label for="sched-dose" class="block text-sm mb-2">Dose</label>
 					<input 
+						id="sched-dose"
 						type="number" 
 						name="dose" 
 						bind:value={schedDose}
@@ -730,8 +737,8 @@
 				</div>
 				
 				<div>
-					<label class="block text-sm mb-2">Days</label>
-					<div class="flex gap-1">
+					<div class="block text-sm mb-2">Days</div>
+					<div class="flex gap-1" role="group" aria-label="Days of week">
 						{#each dayLabels as label, i}
 							<button
 								type="button"
@@ -759,8 +766,9 @@
 				</label>
 				
 				<div>
-					<label class="block text-sm mb-2">Label (optional)</label>
+					<label for="sched-label" class="block text-sm mb-2">Label (optional)</label>
 					<input 
+						id="sched-label"
 						type="text" 
 						name="name" 
 						bind:value={schedName}
