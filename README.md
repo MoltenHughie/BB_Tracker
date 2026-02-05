@@ -28,6 +28,9 @@ npm install
 # Run dev server
 npm run dev
 
+# Typecheck / Svelte diagnostics
+npm run check
+
 # Build
 npm run build
 
