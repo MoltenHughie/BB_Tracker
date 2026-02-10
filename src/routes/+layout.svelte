@@ -5,6 +5,7 @@
 	let { children } = $props();
 
 	const navItems = [
+		{ href: '/', label: 'Home', icon: '🏠' },
 		{ href: '/calories', label: 'Calories', icon: '🍎' },
 		{ href: '/training', label: 'Training', icon: '💪' },
 		{ href: '/supplements', label: 'Supps', icon: '💊' },
@@ -28,7 +29,7 @@
 	<nav class="fixed bottom-0 left-0 right-0 h-[var(--nav-height)] bg-[var(--color-surface)] border-t border-[var(--color-surface-hover)] safe-area-inset-bottom">
 		<div class="flex items-center justify-around h-full max-w-lg mx-auto">
 			{#each navItems as item}
-				{@const isActive = $page.url.pathname.startsWith(item.href)}
+				{@const isActive = item.href === '/' ? $page.url.pathname === '/' : $page.url.pathname.startsWith(item.href)}
 				<a
 					href={item.href}
 					class="flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors duration-200 {isActive
