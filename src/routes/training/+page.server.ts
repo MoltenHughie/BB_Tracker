@@ -7,7 +7,7 @@ import {
 	workoutSets,
 	personalRecords
 } from '$lib/server/db/schema';
-import { eq, desc, asc, and, gte } from 'drizzle-orm';
+import { eq, desc, asc, and, gte, isNull } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 
@@ -49,7 +49,7 @@ export const load: PageServerLoad = async () => {
 
 	// Get active (unfinished) workout if any
 	const activeWorkout = await db.query.workouts.findFirst({
-		where: eq(workouts.finishedAt, ''),
+		where: isNull(workouts.finishedAt),
 		with: {
 			template: true,
 			sets: {
@@ -96,7 +96,7 @@ export const actions: Actions = {
 			name: workoutName || 'Workout',
 			date: today,
 			startedAt: now,
-			finishedAt: '', // Empty string means in progress
+			finishedAt: null,
 			createdAt: now
 		}).returning({ id: workouts.id });
 

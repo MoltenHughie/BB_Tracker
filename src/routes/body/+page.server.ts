@@ -311,20 +311,42 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
-	// Add a photo reference (file upload handled separately)
+	// Upload a check-in photo (stores on disk, DB holds reference)
 	addPhoto: async ({ request }) => {
 		const data = await request.formData();
-		const date = data.get('date') as string;
-		const filename = data.get('filename') as string;
+		const date = data.get('date') as string || new Date().toISOString().split('T')[0];
+		const file = data.get('photo') as File | null;
 		const pose = data.get('pose') as string || null;
 		const notes = data.get('notes') as string || null;
 
-		if (!filename) {
-			return fail(400, { error: 'Filename is required' });
+		if (!file || file.size === 0) {
+			return fail(400, { error: 'Photo file is required' });
 		}
 
-		const now = new Date().toISOString();
+		// Validate file type
+		const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
+		if (!allowed.includes(file.type)) {
+			return fail(400, { error: 'Invalid file type. Use JPEG, PNG, WebP, or HEIC.' });
+		}
 
+		// Limit file size (10MB)
+		if (file.size > 10 * 1024 * 1024) {
+			return fail(400, { error: 'File too large. Max 10MB.' });
+		}
+
+		const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+		const filename = `${date}_${pose || 'photo'}_${Date.now()}.${ext}`;
+
+		// Write to disk
+		const { writeFile, mkdir } = await import('node:fs/promises');
+		const { join } = await import('node:path');
+		const uploadDir = join(process.cwd(), 'data', 'uploads', 'photos');
+		await mkdir(uploadDir, { recursive: true });
+
+		const buffer = Buffer.from(await file.arrayBuffer());
+		await writeFile(join(uploadDir, filename), buffer);
+
+		const now = new Date().toISOString();
 		await db.insert(bodyPhotos).values({
 			date,
 			filename,
