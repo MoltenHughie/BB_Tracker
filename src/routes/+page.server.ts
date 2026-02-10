@@ -9,7 +9,7 @@ import {
 	supplementSchedules,
 	supplements
 } from '$lib/server/db/schema';
-import { eq, desc, and, gte, isNull, sql } from 'drizzle-orm';
+import { eq, desc, isNull } from 'drizzle-orm';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async () => {

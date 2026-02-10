@@ -1,12 +1,6 @@
 import { db } from '$lib/server/db';
-import { 
-	foods, 
-	foodServings, 
-	foodEntries, 
-	mealTypes, 
-	dailyTargets 
-} from '$lib/server/db/schema';
-import { eq, and, desc, asc, like } from 'drizzle-orm';
+import { foods, foodEntries, mealTypes, dailyTargets } from '$lib/server/db/schema';
+import { eq, desc, asc } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 
