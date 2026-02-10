@@ -16,6 +16,14 @@
 		}
 	});
 
+	const alert = $derived(
+		form?.error
+			? { kind: 'error' as const, text: form.error as string }
+			: form?.success
+				? { kind: 'success' as const, text: 'Import complete. Refresh to see updated stats.' }
+				: null
+	);
+
 	const statItems = $derived([
 		{ label: 'Foods in library', value: data.stats.foods, icon: '🍎' },
 		{ label: 'Food log entries', value: data.stats.foodEntries, icon: '📝' },
@@ -33,6 +41,12 @@
 	<header class="text-center">
 		<h1 class="text-2xl font-bold">Settings</h1>
 	</header>
+
+	{#if alert}
+		<div class={alert.kind === 'error' ? 'card border border-red-500/30 bg-red-500/10 text-red-200' : 'card border border-emerald-500/30 bg-emerald-500/10 text-emerald-200'}>
+			{alert.text}
+		</div>
+	{/if}
 
 	<!-- Database Stats -->
 	<section class="card">
@@ -53,15 +67,37 @@
 	<!-- Data Management -->
 	<section class="card">
 		<h2 class="text-lg font-semibold mb-4">💾 Data Management</h2>
-		<div class="space-y-3">
-			<form method="POST" action="?/exportData" use:enhance>
-				<button type="submit" class="btn-primary w-full">
-					📥 Export All Data (JSON)
-				</button>
-			</form>
-			<p class="text-xs text-[var(--color-text-muted)]">
-				Downloads a complete backup of all your data as a JSON file.
-			</p>
+
+		<div class="space-y-6">
+			<div class="space-y-3">
+				<form method="POST" action="?/exportData" use:enhance>
+					<button type="submit" class="btn-primary w-full">
+						📥 Export All Data (JSON)
+					</button>
+				</form>
+				<p class="text-xs text-[var(--color-text-muted)]">
+					Downloads a complete backup of all your data as a JSON file.
+				</p>
+			</div>
+
+			<div class="border-t border-[var(--color-border)] pt-5 space-y-3">
+				<h3 class="font-semibold">Restore from backup</h3>
+				<form method="POST" action="?/importData" enctype="multipart/form-data" use:enhance>
+					<input
+						type="file"
+						name="backup"
+						accept="application/json"
+						required
+						class="block w-full text-sm"
+					/>
+					<button type="submit" class="btn-secondary w-full mt-3">
+						📤 Import (overwrite)
+					</button>
+				</form>
+				<p class="text-xs text-[var(--color-text-muted)]">
+					<strong>Warning:</strong> this overwrites your current database contents.
+				</p>
+			</div>
 		</div>
 	</section>
 

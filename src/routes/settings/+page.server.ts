@@ -1,4 +1,4 @@
-import { db } from '$lib/server/db';
+import { db, sqlite } from '$lib/server/db';
 import {
 	foods, foodEntries, dailyTargets, mealTypes,
 	exercises, workoutTemplates, templateExercises, workouts, workoutSets, personalRecords,
@@ -7,7 +7,7 @@ import {
 	appSettings
 } from '$lib/server/db/schema';
 import { count } from 'drizzle-orm';
-import { json } from '@sveltejs/kit';
+import { fail } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 
 export const load: PageServerLoad = async () => {
@@ -69,5 +69,91 @@ export const actions: Actions = {
 		};
 
 		return { exportJson: JSON.stringify(data, null, 2) };
+	},
+
+	importData: async ({ request }) => {
+		const form = await request.formData();
+		const file = form.get('backup');
+		if (!(file instanceof File)) return fail(400, { error: 'Missing backup file.' });
+
+		let payload: any;
+		try {
+			payload = JSON.parse(await file.text());
+		} catch {
+			return fail(400, { error: 'Invalid JSON file.' });
+		}
+
+		if (!payload || typeof payload !== 'object') return fail(400, { error: 'Invalid backup payload.' });
+		if (payload.version !== '1.0') return fail(400, { error: `Unsupported backup version: ${String(payload.version)}` });
+
+		const tx = sqlite.transaction(() => {
+			// Be permissive: restore should work even if foreign key relationships changed slightly.
+			sqlite.exec('PRAGMA foreign_keys = OFF;');
+
+			// Clear (children first not required with FK off)
+			db.delete(workoutSets).run();
+			db.delete(workouts).run();
+			db.delete(templateExercises).run();
+			db.delete(workoutTemplates).run();
+			db.delete(personalRecords).run();
+			db.delete(exercises).run();
+
+			db.delete(foodEntries).run();
+			db.delete(dailyTargets).run();
+			db.delete(mealTypes).run();
+			db.delete(foods).run();
+
+			db.delete(supplementLogs).run();
+			db.delete(supplementSchedules).run();
+			db.delete(supplements).run();
+
+			db.delete(bodyPhotos).run();
+			db.delete(bodyMeasurements).run();
+			db.delete(measurementTypes).run();
+			db.delete(bodyComposition).run();
+			db.delete(bodyWeights).run();
+
+			db.delete(appSettings).run();
+
+			// Insert (parents first where possible)
+			const insertMany = (table: any, rows: any) => {
+				if (!Array.isArray(rows) || rows.length === 0) return;
+				db.insert(table).values(rows as any).run();
+			};
+
+			insertMany(foods, payload.foods);
+			insertMany(mealTypes, payload.mealTypes);
+			insertMany(dailyTargets, payload.dailyTargets);
+			insertMany(foodEntries, payload.foodEntries);
+
+			insertMany(exercises, payload.exercises);
+			insertMany(workoutTemplates, payload.workoutTemplates);
+			insertMany(templateExercises, payload.templateExercises);
+			insertMany(workouts, payload.workouts);
+			insertMany(workoutSets, payload.workoutSets);
+			insertMany(personalRecords, payload.personalRecords);
+
+			insertMany(supplements, payload.supplements);
+			insertMany(supplementSchedules, payload.supplementSchedules);
+			insertMany(supplementLogs, payload.supplementLogs);
+
+			insertMany(measurementTypes, payload.measurementTypes);
+			insertMany(bodyWeights, payload.bodyWeights);
+			insertMany(bodyMeasurements, payload.bodyMeasurements);
+			insertMany(bodyComposition, payload.bodyComposition);
+			insertMany(bodyPhotos, payload.bodyPhotos);
+
+			insertMany(appSettings, payload.appSettings);
+
+			sqlite.exec('PRAGMA foreign_keys = ON;');
+		});
+
+		try {
+			tx();
+		} catch (e: any) {
+			return fail(500, { error: `Import failed: ${e?.message ?? String(e)}` });
+		}
+
+		return { success: true };
 	}
 };
