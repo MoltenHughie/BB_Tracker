@@ -158,30 +158,50 @@ export const workoutTemplates = sqliteTable('workout_templates', {
 });
 
 // Exercises in a template
-export const templateExercises = sqliteTable('template_exercises', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
-	templateId: integer('template_id').notNull().references(() => workoutTemplates.id, { onDelete: 'cascade' }),
-	exerciseId: integer('exercise_id').notNull().references(() => exercises.id),
-	sortOrder: integer('sort_order').default(0),
-	targetSets: integer('target_sets').default(3),
-	targetRepsMin: integer('target_reps_min').default(8),
-	targetRepsMax: integer('target_reps_max').default(12),
-	notes: text('notes')
-});
+export const templateExercises = sqliteTable(
+	'template_exercises',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		templateId: integer('template_id')
+			.notNull()
+			.references(() => workoutTemplates.id, { onDelete: 'cascade' }),
+		exerciseId: integer('exercise_id').notNull().references(() => exercises.id),
+		sortOrder: integer('sort_order').default(0),
+		targetSets: integer('target_sets').default(3),
+		targetRepsMin: integer('target_reps_min').default(8),
+		targetRepsMax: integer('target_reps_max').default(12),
+		notes: text('notes')
+	},
+	(table) => ({
+		templateIdx: index('template_exercises_template_id_idx').on(table.templateId),
+		templateExerciseUnique: uniqueIndex('template_exercises_template_exercise_unique').on(
+			table.templateId,
+			table.exerciseId
+		),
+		templateSortIdx: index('template_exercises_template_sort_idx').on(table.templateId, table.sortOrder)
+	})
+);
 
 // Completed workouts
-export const workouts = sqliteTable('workouts', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
-	templateId: integer('template_id').references(() => workoutTemplates.id),
-	name: text('name').notNull(), // copied from template or custom
-	date: text('date').notNull(), // ISO date
-	startedAt: text('started_at').notNull(),
-	finishedAt: text('finished_at'),
-	durationSeconds: integer('duration_seconds'),
-	notes: text('notes'),
-	rating: integer('rating'), // 1-5 subjective rating
-	createdAt: text('created_at').notNull()
-});
+export const workouts = sqliteTable(
+	'workouts',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		templateId: integer('template_id').references(() => workoutTemplates.id),
+		name: text('name').notNull(), // copied from template or custom
+		date: text('date').notNull(), // ISO date
+		startedAt: text('started_at').notNull(),
+		finishedAt: text('finished_at'),
+		durationSeconds: integer('duration_seconds'),
+		notes: text('notes'),
+		rating: integer('rating'), // 1-5 subjective rating
+		createdAt: text('created_at').notNull()
+	},
+	(table) => ({
+		dateIdx: index('workouts_date_idx').on(table.date),
+		templateDateIdx: index('workouts_template_date_idx').on(table.templateId, table.date)
+	})
+);
 
 // Individual sets in a workout
 export const workoutSets = sqliteTable(
@@ -210,17 +230,24 @@ export const workoutSets = sqliteTable(
 );
 
 // Personal records
-export const personalRecords = sqliteTable('personal_records', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
-	exerciseId: integer('exercise_id').notNull().references(() => exercises.id),
-	recordType: text('record_type').notNull(), // '1rm', '3rm', '5rm', 'volume', 'reps'
-	value: real('value').notNull(),
-	weight: real('weight'), // for rep PRs
-	reps: integer('reps'), // for rep PRs
-	workoutSetId: integer('workout_set_id').references(() => workoutSets.id),
-	date: text('date').notNull(),
-	createdAt: text('created_at').notNull()
-});
+export const personalRecords = sqliteTable(
+	'personal_records',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		exerciseId: integer('exercise_id').notNull().references(() => exercises.id),
+		recordType: text('record_type').notNull(), // '1rm', '3rm', '5rm', 'volume', 'reps'
+		value: real('value').notNull(),
+		weight: real('weight'), // for rep PRs
+		reps: integer('reps'), // for rep PRs
+		workoutSetId: integer('workout_set_id').references(() => workoutSets.id),
+		date: text('date').notNull(),
+		createdAt: text('created_at').notNull()
+	},
+	(table) => ({
+		exerciseTypeIdx: index('personal_records_exercise_type_idx').on(table.exerciseId, table.recordType),
+		exerciseDateIdx: index('personal_records_exercise_date_idx').on(table.exerciseId, table.date)
+	})
+);
 
 // ============================================================================
 // SUPPLEMENT TRACKER
@@ -253,49 +280,72 @@ export const supplements = sqliteTable('supplements', {
 });
 
 // Supplement schedules
-export const supplementSchedules = sqliteTable('supplement_schedules', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
-	supplementId: integer('supplement_id').notNull().references(() => supplements.id, { onDelete: 'cascade' }),
-	name: text('name'), // e.g., "Morning", "Pre-workout"
-	timeOfDay: text('time_of_day'), // 'morning', 'noon', 'evening', 'night', 'preworkout', 'postworkout'
-	scheduledTime: text('scheduled_time'), // HH:MM format
-	daysOfWeek: text('days_of_week'), // JSON array: [0,1,2,3,4,5,6] (0=Sunday)
-	dose: real('dose').notNull(), // number of servings
-	withFood: integer('with_food', { mode: 'boolean' }),
-	notes: text('notes'),
-	isActive: integer('is_active', { mode: 'boolean' }).default(true),
-	createdAt: text('created_at').notNull(),
-	updatedAt: text('updated_at').notNull()
-});
+export const supplementSchedules = sqliteTable(
+	'supplement_schedules',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		supplementId: integer('supplement_id')
+			.notNull()
+			.references(() => supplements.id, { onDelete: 'cascade' }),
+		name: text('name'), // e.g., "Morning", "Pre-workout"
+		timeOfDay: text('time_of_day'), // 'morning', 'noon', 'evening', 'night', 'preworkout', 'postworkout'
+		scheduledTime: text('scheduled_time'), // HH:MM format
+		daysOfWeek: text('days_of_week'), // JSON array: [0,1,2,3,4,5,6] (0=Sunday)
+		dose: real('dose').notNull(), // number of servings
+		withFood: integer('with_food', { mode: 'boolean' }),
+		notes: text('notes'),
+		isActive: integer('is_active', { mode: 'boolean' }).default(true),
+		createdAt: text('created_at').notNull(),
+		updatedAt: text('updated_at').notNull()
+	},
+	(table) => ({
+		supplementIdx: index('supplement_schedules_supplement_id_idx').on(table.supplementId),
+		activeTimeIdx: index('supplement_schedules_active_time_idx').on(table.isActive, table.scheduledTime)
+	})
+);
 
 // Supplement intake logs
-export const supplementLogs = sqliteTable('supplement_logs', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
-	supplementId: integer('supplement_id').notNull().references(() => supplements.id),
-	scheduleId: integer('schedule_id').references(() => supplementSchedules.id),
-	date: text('date').notNull(), // ISO date
-	dose: real('dose').notNull(),
-	takenAt: text('taken_at').notNull(), // ISO datetime
-	// Auto-log to food entries
-	foodEntryId: integer('food_entry_id').references(() => foodEntries.id),
-	notes: text('notes'),
-	createdAt: text('created_at').notNull()
-});
+export const supplementLogs = sqliteTable(
+	'supplement_logs',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		supplementId: integer('supplement_id').notNull().references(() => supplements.id),
+		scheduleId: integer('schedule_id').references(() => supplementSchedules.id),
+		date: text('date').notNull(), // ISO date
+		dose: real('dose').notNull(),
+		takenAt: text('taken_at').notNull(), // ISO datetime
+		// Auto-log to food entries
+		foodEntryId: integer('food_entry_id').references(() => foodEntries.id),
+		notes: text('notes'),
+		createdAt: text('created_at').notNull()
+	},
+	(table) => ({
+		dateIdx: index('supplement_logs_date_idx').on(table.date),
+		supplementDateIdx: index('supplement_logs_supplement_date_idx').on(table.supplementId, table.date),
+		scheduleDateIdx: index('supplement_logs_schedule_date_idx').on(table.scheduleId, table.date)
+	})
+);
 
 // ============================================================================
 // BODY TRACKER
 // ============================================================================
 
 // Body weight entries
-export const bodyWeights = sqliteTable('body_weights', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
-	date: text('date').notNull(), // ISO date
-	weight: real('weight').notNull(), // kg (primary unit)
-	time: text('time'), // HH:MM - time of measurement
-	condition: text('condition'), // 'fasted', 'post_meal', 'post_workout'
-	notes: text('note'),
-	createdAt: text('created_at').notNull()
-});
+export const bodyWeights = sqliteTable(
+	'body_weights',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		date: text('date').notNull(), // ISO date
+		weight: real('weight').notNull(), // kg (primary unit)
+		time: text('time'), // HH:MM - time of measurement
+		condition: text('condition'), // 'fasted', 'post_meal', 'post_workout'
+		notes: text('note'),
+		createdAt: text('created_at').notNull()
+	},
+	(table) => ({
+		dateIdx: index('body_weights_date_idx').on(table.date)
+	})
+);
 
 // Measurement types
 export const measurementTypes = sqliteTable(
@@ -313,37 +363,56 @@ export const measurementTypes = sqliteTable(
 );
 
 // Body measurements
-export const bodyMeasurements = sqliteTable('body_measurements', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
-	date: text('date').notNull(), // ISO date
-	measurementTypeId: integer('measurement_type_id').notNull().references(() => measurementTypes.id),
-	value: real('value').notNull(),
-	notes: text('notes'),
-	createdAt: text('created_at').notNull()
-});
+export const bodyMeasurements = sqliteTable(
+	'body_measurements',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		date: text('date').notNull(), // ISO date
+		measurementTypeId: integer('measurement_type_id').notNull().references(() => measurementTypes.id),
+		value: real('value').notNull(),
+		notes: text('notes'),
+		createdAt: text('created_at').notNull()
+	},
+	(table) => ({
+		dateIdx: index('body_measurements_date_idx').on(table.date),
+		typeDateIdx: index('body_measurements_type_date_idx').on(table.measurementTypeId, table.date)
+	})
+);
 
 // Check-in photos (stored on disk, DB has reference)
-export const bodyPhotos = sqliteTable('body_photos', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
-	date: text('date').notNull(), // ISO date
-	filename: text('filename').notNull(), // relative path in uploads/photos/
-	pose: text('pose'), // 'front', 'back', 'side_left', 'side_right', 'front_relaxed', 'front_flexed'
-	notes: text('notes'),
-	createdAt: text('created_at').notNull()
-});
+export const bodyPhotos = sqliteTable(
+	'body_photos',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		date: text('date').notNull(), // ISO date
+		filename: text('filename').notNull(), // relative path in uploads/photos/
+		pose: text('pose'), // 'front', 'back', 'side_left', 'side_right', 'front_relaxed', 'front_flexed'
+		notes: text('notes'),
+		createdAt: text('created_at').notNull()
+	},
+	(table) => ({
+		dateIdx: index('body_photos_date_idx').on(table.date)
+	})
+);
 
 // Body composition estimates (if user tracks BF%, muscle mass, etc.)
-export const bodyComposition = sqliteTable('body_composition', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
-	date: text('date').notNull(), // ISO date
-	bodyFatPercent: real('body_fat_percent'),
-	muscleMassKg: real('muscle_mass_kg'),
-	boneMassKg: real('bone_mass_kg'),
-	waterPercent: real('water_percent'),
-	method: text('method'), // 'scale', 'caliper', 'dexa', 'estimate'
-	notes: text('notes'),
-	createdAt: text('created_at').notNull()
-});
+export const bodyComposition = sqliteTable(
+	'body_composition',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		date: text('date').notNull(), // ISO date
+		bodyFatPercent: real('body_fat_percent'),
+		muscleMassKg: real('muscle_mass_kg'),
+		boneMassKg: real('bone_mass_kg'),
+		waterPercent: real('water_percent'),
+		method: text('method'), // 'scale', 'caliper', 'dexa', 'estimate'
+		notes: text('notes'),
+		createdAt: text('created_at').notNull()
+	},
+	(table) => ({
+		dateIdx: index('body_composition_date_idx').on(table.date)
+	})
+);
 
 // ============================================================================
 // RELATIONS
