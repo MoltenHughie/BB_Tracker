@@ -11,7 +11,8 @@
 	let showAddTypeModal = $state(false);
 	
 	// Active tab
-	let activeTab = $state<'weight' | 'measurements' | 'composition'>('weight');
+	let activeTab = $state<'weight' | 'measurements' | 'composition' | 'photos'>('weight');
+	let showPhotoModal = $state(false);
 	
 	// Form states
 	let weightValue = $state<number | null>(null);
@@ -132,7 +133,8 @@
 		{#each [
 			{ key: 'weight', label: 'Weight', icon: '⚖️' },
 			{ key: 'measurements', label: 'Measurements', icon: '📐' },
-			{ key: 'composition', label: 'Composition', icon: '🔬' }
+			{ key: 'composition', label: 'Composition', icon: '🔬' },
+			{ key: 'photos', label: 'Photos', icon: '📸' }
 		] as tab}
 			<button
 				onclick={() => activeTab = tab.key as typeof activeTab}
@@ -388,6 +390,55 @@
 				</div>
 			</section>
 		{/if}
+	{:else if activeTab === 'photos'}
+		<!-- PHOTOS TAB -->
+		<section class="card">
+			<div class="flex items-center justify-between mb-3">
+				<h2 class="text-lg font-semibold">Check-in Photos</h2>
+				<button onclick={() => showPhotoModal = true} class="btn btn-secondary text-sm px-3 py-1">
+					+ Upload
+				</button>
+			</div>
+			
+			{#if data.photos.length > 0}
+				<div class="grid grid-cols-2 gap-3">
+					{#each data.photos as photo}
+						<div class="relative group">
+							<img
+								src="/api/photos/{photo.filename}"
+								alt="{photo.pose || 'Check-in'} - {photo.date}"
+								class="w-full aspect-[3/4] object-cover rounded-lg"
+								loading="lazy"
+							/>
+							<div class="absolute bottom-0 left-0 right-0 bg-black/60 p-2 rounded-b-lg">
+								<div class="text-xs text-white">
+									{new Date(photo.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+								</div>
+								{#if photo.pose}
+									<div class="text-xs text-white/70 capitalize">{photo.pose.replace('_', ' ')}</div>
+								{/if}
+							</div>
+							<form method="POST" action="?/deletePhoto" use:enhance>
+								<input type="hidden" name="photoId" value={photo.id} />
+								<button
+									type="submit"
+									class="absolute top-2 right-2 w-6 h-6 bg-red-500/80 rounded-full text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+									onclick={(e) => { if (!confirm('Delete this photo?')) e.preventDefault(); }}
+								>
+									×
+								</button>
+							</form>
+						</div>
+					{/each}
+				</div>
+			{:else}
+				<div class="text-center text-[var(--color-text-muted)] py-8">
+					<p class="text-4xl mb-2">📸</p>
+					<p>No check-in photos yet</p>
+					<p class="text-sm mt-1">Upload your first progress photo</p>
+				</div>
+			{/if}
+		</section>
 	{/if}
 	
 	<!-- Floating action button -->
@@ -399,6 +450,8 @@
 			} else if (activeTab === 'measurements') {
 				resetMeasurementForm();
 				showMeasurementModal = true;
+			} else if (activeTab === 'photos') {
+				showPhotoModal = true;
 			} else {
 				showCompositionModal = true;
 			}
@@ -759,6 +812,64 @@
 					<p class="text-center text-[var(--color-text-muted)] py-8">No weight entries yet</p>
 				{/if}
 			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Photo Upload Modal -->
+{#if showPhotoModal}
+	<div class="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
+		<div class="bg-[var(--color-surface)] w-full max-w-lg rounded-t-2xl sm:rounded-2xl">
+			<div class="p-4 border-b border-[var(--color-surface-hover)] flex items-center justify-between">
+				<h3 class="text-lg font-semibold">Upload Photo</h3>
+				<button onclick={() => showPhotoModal = false} class="text-2xl">×</button>
+			</div>
+			
+			<form 
+				method="POST" 
+				action="?/addPhoto"
+				enctype="multipart/form-data"
+				use:enhance={() => {
+					return async ({ update }) => {
+						await update();
+						showPhotoModal = false;
+					};
+				}}
+				class="p-4 space-y-4"
+			>
+				<input type="hidden" name="date" value={data.date} />
+				
+				<div>
+					<label for="photo-file" class="block text-sm mb-2">Photo *</label>
+					<input 
+						id="photo-file"
+						type="file" 
+						name="photo" 
+						accept="image/jpeg,image/png,image/webp,image/heic"
+						required
+						class="input"
+					/>
+				</div>
+				
+				<div>
+					<label for="photo-pose" class="block text-sm mb-2">Pose (optional)</label>
+					<select id="photo-pose" name="pose" class="input">
+						<option value="">— Select —</option>
+						<option value="front_relaxed">Front (relaxed)</option>
+						<option value="front_flexed">Front (flexed)</option>
+						<option value="back">Back</option>
+						<option value="side_left">Side (left)</option>
+						<option value="side_right">Side (right)</option>
+					</select>
+				</div>
+				
+				<div>
+					<label for="photo-notes" class="block text-sm mb-2">Notes (optional)</label>
+					<textarea id="photo-notes" name="notes" class="input h-16 resize-none" placeholder="e.g., morning fasted"></textarea>
+				</div>
+				
+				<button type="submit" class="btn btn-primary w-full">Upload</button>
+			</form>
 		</div>
 	</div>
 {/if}
