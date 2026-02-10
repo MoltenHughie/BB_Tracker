@@ -118,14 +118,30 @@
 </script>
 
 <div class="space-y-6 pb-4">
-	<header class="flex items-center justify-between">
-		<h1 class="text-2xl font-bold">📏 Body</h1>
-		<button 
-			onclick={() => showHistoryModal = true}
-			class="text-[var(--color-text-muted)] text-sm hover:text-[var(--color-text)]"
-		>
-			{data.date}
-		</button>
+	<header class="space-y-2">
+		<div class="flex items-center justify-between">
+			<h1 class="text-2xl font-bold">📏 Body</h1>
+			<button 
+				onclick={() => showHistoryModal = true}
+				class="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
+			>
+				📊 History
+			</button>
+		</div>
+		<div class="flex items-center justify-center gap-4">
+			<button onclick={() => { const d = new Date(data.date); d.setDate(d.getDate() - 1); window.location.href = `/body?date=${d.toISOString().split('T')[0]}`; }} class="text-xl px-2 hover:text-[var(--color-primary)]">‹</button>
+			<button 
+				onclick={() => { const today = new Date().toISOString().split('T')[0]; if (data.date !== today) window.location.href = '/body'; }}
+				class="text-sm font-medium {data.date === new Date().toISOString().split('T')[0] ? 'text-[var(--color-primary)]' : 'hover:text-[var(--color-primary)]'}"
+			>
+				{data.date === new Date().toISOString().split('T')[0] ? 'Today' : data.date}
+			</button>
+			<button 
+				onclick={() => { const d = new Date(data.date); d.setDate(d.getDate() + 1); window.location.href = `/body?date=${d.toISOString().split('T')[0]}`; }}
+				class="text-xl px-2 hover:text-[var(--color-primary)] {data.date === new Date().toISOString().split('T')[0] ? 'opacity-30 pointer-events-none' : ''}"
+				disabled={data.date === new Date().toISOString().split('T')[0]}
+			>›</button>
+		</div>
 	</header>
 
 	<!-- Tab navigation -->
