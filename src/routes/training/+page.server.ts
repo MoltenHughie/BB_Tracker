@@ -99,13 +99,25 @@ export const load: PageServerLoad = async () => {
 		}
 	}
 
+	// Get all PRs with exercise names
+	const allPRsRaw = await db.query.personalRecords.findMany({
+		orderBy: desc(personalRecords.createdAt)
+	});
+	// Enrich with exercise names
+	const exerciseMap = Object.fromEntries(allExercises.map(e => [e.id, e]));
+	const allPRs = allPRsRaw.map(pr => ({
+		...pr,
+		exercise: exerciseMap[pr.exerciseId] ?? { name: 'Unknown', id: pr.exerciseId }
+	}));
+
 	return {
 		templates,
 		recentWorkouts,
 		thisWeekWorkouts,
 		activeWorkout,
 		allExercises,
-		previousPerformance
+		previousPerformance,
+		personalRecords: allPRs
 	};
 };
 

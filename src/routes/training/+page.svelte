@@ -480,6 +480,23 @@
 			</div>
 		</section>
 
+		<!-- Personal Records -->
+		{#if data.personalRecords.length > 0}
+			<section class="card">
+				<h2 class="text-lg font-semibold mb-3">🏆 Personal Records</h2>
+				<div class="space-y-2 max-h-40 overflow-y-auto">
+					{#each data.personalRecords.slice(0, 8) as pr}
+						<div class="flex items-center justify-between text-sm">
+							<span class="font-medium">{pr.exercise.name}</span>
+							<span class="text-[var(--color-primary)] font-bold">
+								{pr.recordType === '1rm' ? `${pr.value.toFixed(1)} kg (est. 1RM)` : `${pr.value}`}
+							</span>
+						</div>
+					{/each}
+				</div>
+			</section>
+		{/if}
+
 		<!-- Recent workouts -->
 		<section class="space-y-4">
 			<h2 class="text-lg font-semibold">Recent Workouts</h2>
