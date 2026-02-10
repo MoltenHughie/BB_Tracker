@@ -8,6 +8,8 @@
 	let showAddFoodModal = $state(false);
 	let showQuickAddModal = $state(false);
 	let showTargetModal = $state(false);
+	let editingEntryId = $state<number | null>(null);
+	let editServings = $state(1);
 	
 	// Form states
 	let selectedMealId = $state<number | null>(null);
@@ -229,7 +231,10 @@
 					<ul class="space-y-2">
 						{#each mealEntries as entry}
 							<li class="flex items-center justify-between py-2 border-b border-[var(--color-surface-hover)] last:border-0">
-								<div class="flex-1 min-w-0">
+								<button 
+									class="flex-1 min-w-0 text-left"
+									onclick={() => { editingEntryId = editingEntryId === entry.id ? null : entry.id; editServings = entry.quantity ?? 1; }}
+								>
 									<div class="font-medium truncate">{entry.food.name}</div>
 									<div class="text-sm text-[var(--color-text-muted)]">
 										{entry.serving?.name ?? `${entry.customGrams ?? 100}g`}
@@ -237,7 +242,7 @@
 											× {entry.quantity}
 										{/if}
 									</div>
-								</div>
+								</button>
 								<div class="flex items-center gap-3">
 									<div class="text-right">
 										<div class="font-medium">{Math.round(entry.calories)} kcal</div>
@@ -261,6 +266,35 @@
 									</form>
 								</div>
 							</li>
+							{#if editingEntryId === entry.id}
+								<li class="py-2 px-2 bg-[var(--color-bg)] rounded-lg">
+									<form 
+										method="POST" 
+										action="?/updateEntry"
+										use:enhance={() => {
+											return async ({ update }) => {
+												await update();
+												editingEntryId = null;
+											};
+										}}
+										class="flex items-center gap-3"
+									>
+										<input type="hidden" name="entryId" value={entry.id} />
+										<label for="edit-qty-{entry.id}" class="text-sm text-[var(--color-text-muted)]">Qty:</label>
+										<input 
+											id="edit-qty-{entry.id}"
+											type="number" 
+											name="quantity" 
+											bind:value={editServings}
+											step="0.25" 
+											min="0.25"
+											class="input w-20 text-center"
+										/>
+										<button type="submit" class="btn btn-primary text-sm px-3">Save</button>
+										<button type="button" onclick={() => editingEntryId = null} class="text-sm text-[var(--color-text-muted)]">Cancel</button>
+									</form>
+								</li>
+							{/if}
 						{/each}
 					</ul>
 				{:else}

@@ -137,6 +137,62 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
+	updateEntry: async ({ request }) => {
+		const data = await request.formData();
+		const entryId = parseInt(data.get('entryId') as string);
+		const quantity = parseFloat(data.get('quantity') as string);
+
+		if (!entryId || isNaN(entryId)) {
+			return fail(400, { error: 'Entry ID is required' });
+		}
+		if (isNaN(quantity) || quantity <= 0) {
+			return fail(400, { error: 'Quantity must be a positive number' });
+		}
+
+		// Get the entry with food + serving to recalculate
+		const entry = await db.query.foodEntries.findFirst({
+			where: eq(foodEntries.id, entryId),
+			with: { food: true, serving: true }
+		});
+
+		if (!entry || !entry.food) {
+			return fail(404, { error: 'Entry not found' });
+		}
+
+		const food = entry.food;
+		// Calculate per-unit values (based on serving or 100g)
+		let baseCalories: number, baseProtein: number, baseCarbs: number, baseFat: number;
+		if (entry.serving) {
+			const grams = entry.serving.grams ?? 100;
+			baseCalories = (food.calories / 100) * grams;
+			baseProtein = (food.protein / 100) * grams;
+			baseCarbs = (food.carbs / 100) * grams;
+			baseFat = (food.fat / 100) * grams;
+		} else if (entry.customGrams) {
+			baseCalories = (food.calories / 100) * entry.customGrams;
+			baseProtein = (food.protein / 100) * entry.customGrams;
+			baseCarbs = (food.carbs / 100) * entry.customGrams;
+			baseFat = (food.fat / 100) * entry.customGrams;
+		} else {
+			baseCalories = food.calories;
+			baseProtein = food.protein;
+			baseCarbs = food.carbs;
+			baseFat = food.fat;
+		}
+
+		await db.update(foodEntries)
+			.set({
+				quantity,
+				calories: baseCalories * quantity,
+				protein: baseProtein * quantity,
+				carbs: baseCarbs * quantity,
+				fat: baseFat * quantity,
+			})
+			.where(eq(foodEntries.id, entryId));
+
+		return { success: true };
+	},
+
 	// Quick-add a custom food
 	quickAddFood: async ({ request }) => {
 		const data = await request.formData();
