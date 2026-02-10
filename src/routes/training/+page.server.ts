@@ -110,6 +110,31 @@ export const load: PageServerLoad = async () => {
 		exercise: exerciseMap[pr.exerciseId] ?? { name: 'Unknown', id: pr.exerciseId }
 	}));
 
+	// Weekly volume by category
+	const weeklyVolumeByCategory: Record<string, number> = {};
+	for (const w of thisWeekWorkouts) {
+		if (!('sets' in w)) continue;
+		const wWithSets = w as typeof w & { sets: Array<{ exerciseId: number; weight: number | null; reps: number | null }> };
+		// We need sets for this week's workouts - load them
+	}
+	// Load all sets from this week's workouts
+	const thisWeekWorkoutIds = thisWeekWorkouts.map(w => w.id);
+	if (thisWeekWorkoutIds.length > 0) {
+		const weekSets = await db.query.workoutSets.findMany({
+			where: and(
+				...thisWeekWorkoutIds.length === 1
+					? [eq(workoutSets.workoutId, thisWeekWorkoutIds[0])]
+					: [gte(workoutSets.workoutId, Math.min(...thisWeekWorkoutIds))]
+			)
+		});
+		const filteredSets = weekSets.filter(s => thisWeekWorkoutIds.includes(s.workoutId));
+		for (const set of filteredSets) {
+			const ex = exerciseMap[set.exerciseId];
+			const cat = ex?.category || 'other';
+			weeklyVolumeByCategory[cat] = (weeklyVolumeByCategory[cat] || 0) + 1; // count sets
+		}
+	}
+
 	return {
 		templates,
 		recentWorkouts,
@@ -117,7 +142,8 @@ export const load: PageServerLoad = async () => {
 		activeWorkout,
 		allExercises,
 		previousPerformance,
-		personalRecords: allPRs
+		personalRecords: allPRs,
+		weeklyVolumeByCategory
 	};
 };
 

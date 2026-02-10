@@ -480,6 +480,26 @@
 			</div>
 		</section>
 
+		<!-- Weekly Volume by Category -->
+		{#if Object.keys(data.weeklyVolumeByCategory).length > 0}
+			{@const cats = Object.entries(data.weeklyVolumeByCategory).sort((a, b) => b[1] - a[1])}
+			{@const maxSets = Math.max(...cats.map(c => c[1]))}
+			<section class="card">
+				<h2 class="text-lg font-semibold mb-3">📊 Weekly Sets by Category</h2>
+				<div class="space-y-2">
+					{#each cats as [cat, sets]}
+						<div class="flex items-center gap-3">
+							<span class="w-20 text-sm capitalize">{cat}</span>
+							<div class="flex-1 h-4 bg-[var(--color-bg)] rounded-full overflow-hidden">
+								<div class="h-full bg-[var(--color-primary)] rounded-full transition-all" style="width: {(sets / maxSets) * 100}%"></div>
+							</div>
+							<span class="text-sm font-medium w-8 text-right">{sets}</span>
+						</div>
+					{/each}
+				</div>
+			</section>
+		{/if}
+
 		<!-- Personal Records -->
 		{#if data.personalRecords.length > 0}
 			<section class="card">
