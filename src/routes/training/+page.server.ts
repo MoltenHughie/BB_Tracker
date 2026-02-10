@@ -476,5 +476,33 @@ export const actions: Actions = {
 
 		await db.delete(workoutTemplates).where(eq(workoutTemplates.id, templateId));
 		return { success: true };
+	},
+
+	// Create a custom exercise
+	createExercise: async ({ request }) => {
+		const data = await request.formData();
+		const name = data.get('name') as string;
+		const category = data.get('category') as string || 'other';
+		const equipment = data.get('equipment') as string || 'other';
+
+		if (!name?.trim()) {
+			return fail(400, { error: 'Exercise name is required' });
+		}
+
+		const now = new Date().toISOString();
+
+		await db.insert(exercises).values({
+			name: name.trim(),
+			category,
+			equipment,
+			restWorking: 120,
+			restWarmup: 60,
+			restDropset: 30,
+			restFailure: 180,
+			createdAt: now,
+			updatedAt: now
+		});
+
+		return { success: true };
 	}
 };

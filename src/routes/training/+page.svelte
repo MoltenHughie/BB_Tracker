@@ -13,6 +13,10 @@
 	let showFinishModal = $state(false);
 	let showPRModal = $state(false);
 	let showWorkoutDetailModal = $state(false);
+	let showCreateExercise = $state(false);
+	let createExName = $state('');
+	let createExCategory = $state('other');
+	let createExEquipment = $state('other');
 	let selectedWorkout = $state<typeof data.recentWorkouts[0] | null>(null);
 	
 	// Workout state
@@ -622,6 +626,60 @@
 						</li>
 					{/each}
 				</ul>
+
+				<!-- Create custom exercise -->
+				{#if showCreateExercise}
+					<form
+						method="POST"
+						action="?/createExercise"
+						use:enhance={() => {
+							return async ({ update }) => {
+								await update();
+								showCreateExercise = false;
+								createExName = '';
+								createExCategory = 'other';
+								createExEquipment = 'other';
+							};
+						}}
+						class="mt-3 p-3 rounded-lg bg-[var(--color-bg)] space-y-2"
+					>
+						<div>
+							<input type="text" name="name" bind:value={createExName} class="input text-sm" placeholder="Exercise name" required />
+						</div>
+						<div class="grid grid-cols-2 gap-2">
+							<select name="category" bind:value={createExCategory} class="input text-sm">
+								<option value="chest">Chest</option>
+								<option value="back">Back</option>
+								<option value="shoulders">Shoulders</option>
+								<option value="arms">Arms</option>
+								<option value="legs">Legs</option>
+								<option value="core">Core</option>
+								<option value="cardio">Cardio</option>
+								<option value="other">Other</option>
+							</select>
+							<select name="equipment" bind:value={createExEquipment} class="input text-sm">
+								<option value="barbell">Barbell</option>
+								<option value="dumbbell">Dumbbell</option>
+								<option value="cable">Cable</option>
+								<option value="machine">Machine</option>
+								<option value="bodyweight">Bodyweight</option>
+								<option value="other">Other</option>
+							</select>
+						</div>
+						<div class="flex gap-2">
+							<button type="submit" class="btn btn-primary flex-1 text-sm">Add</button>
+							<button type="button" onclick={() => showCreateExercise = false} class="btn btn-secondary flex-1 text-sm">Cancel</button>
+						</div>
+					</form>
+				{:else}
+					<button
+						type="button"
+						onclick={() => showCreateExercise = true}
+						class="mt-3 w-full text-center p-2 rounded-lg border border-dashed border-[var(--color-surface-hover)] text-sm text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] transition-colors"
+					>
+						+ Create Custom Exercise
+					</button>
+				{/if}
 			</div>
 		</div>
 	</div>
