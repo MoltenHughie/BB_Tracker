@@ -208,13 +208,22 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
-	// Delete a log entry (undo)
+	// Delete a log entry (undo) — also removes auto-logged food entry
 	deleteLog: async ({ request }) => {
 		const data = await request.formData();
 		const logId = parseInt(data.get('logId') as string);
 
 		if (!logId || isNaN(logId)) {
 			return fail(400, { error: 'Log ID is required' });
+		}
+
+		// Check if log has an associated food entry
+		const log = await db.query.supplementLogs.findFirst({
+			where: eq(supplementLogs.id, logId)
+		});
+
+		if (log?.foodEntryId) {
+			await db.delete(foodEntries).where(eq(foodEntries.id, log.foodEntryId));
 		}
 
 		await db.delete(supplementLogs).where(eq(supplementLogs.id, logId));
