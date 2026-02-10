@@ -334,6 +334,27 @@
 		</div>
 	</section>
 	
+	<!-- Micros -->
+	{#if data.totals.fiber > 0 || data.totals.sugar > 0 || data.totals.sodium > 0}
+		<section class="card">
+			<h2 class="text-lg font-semibold mb-3">Micros</h2>
+			<div class="grid grid-cols-3 gap-4 text-center text-sm">
+				<div>
+					<div class="text-lg font-bold">{Math.round(data.totals.fiber)}g</div>
+					<div class="text-[var(--color-text-muted)]">Fiber</div>
+				</div>
+				<div>
+					<div class="text-lg font-bold">{Math.round(data.totals.sugar)}g</div>
+					<div class="text-[var(--color-text-muted)]">Sugar</div>
+				</div>
+				<div>
+					<div class="text-lg font-bold">{Math.round(data.totals.sodium)}mg</div>
+					<div class="text-[var(--color-text-muted)]">Sodium</div>
+				</div>
+			</div>
+		</section>
+	{/if}
+
 	<!-- Quick add button (floating) -->
 	<button
 		onclick={() => showQuickAddModal = true}

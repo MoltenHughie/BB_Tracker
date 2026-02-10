@@ -45,15 +45,23 @@ export const load: PageServerLoad = async ({ url }) => {
 		orderBy: asc(foods.name)
 	});
 
-	// Calculate totals
+	// Calculate totals (macros from entries, micros computed from food * quantity)
 	const totals = entries.reduce(
-		(acc, entry) => ({
-			calories: acc.calories + (entry.calories || 0),
-			protein: acc.protein + (entry.protein || 0),
-			carbs: acc.carbs + (entry.carbs || 0),
-			fat: acc.fat + (entry.fat || 0)
-		}),
-		{ calories: 0, protein: 0, carbs: 0, fat: 0 }
+		(acc, entry) => {
+			const qty = entry.quantity ?? 1;
+			const grams = entry.customGrams ?? (entry.serving as { grams?: number } | null)?.grams ?? 100;
+			const food = entry.food;
+			return {
+				calories: acc.calories + (entry.calories || 0),
+				protein: acc.protein + (entry.protein || 0),
+				carbs: acc.carbs + (entry.carbs || 0),
+				fat: acc.fat + (entry.fat || 0),
+				fiber: acc.fiber + ((food.fiber ?? 0) / 100 * grams * qty),
+				sugar: acc.sugar + ((food.sugar ?? 0) / 100 * grams * qty),
+				sodium: acc.sodium + ((food.sodium ?? 0) / 100 * grams * qty),
+			};
+		},
+		{ calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0, sodium: 0 }
 	);
 
 	return {
