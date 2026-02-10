@@ -50,6 +50,20 @@
 	
 	// Rest timer
 	let editingSetId: number | null = $state(null);
+
+	// Workout summary stats (for finish modal)
+	const workoutTotalVolume = $derived(
+		data.activeWorkout?.sets.reduce((s, set) => s + (set.weight ?? 0) * (set.reps ?? 0), 0) ?? 0
+	);
+	const workoutUniqueExercises = $derived(
+		data.activeWorkout ? new Set(data.activeWorkout.sets.map(s => s.exerciseId)).size : 0
+	);
+	const workoutElapsedMin = $derived(
+		data.activeWorkout?.startedAt
+			? Math.round((Date.now() - new Date(data.activeWorkout.startedAt).getTime()) / 60000)
+			: null
+	);
+
 	let restSeconds = $state(0);
 	let restTarget = $state(120);
 	let restTimerActive = $state(false);
@@ -734,9 +748,25 @@
 				<div class="text-center py-4">
 					<div class="text-4xl mb-2">💪</div>
 					<div class="text-lg font-semibold">Great workout!</div>
-					<div class="text-[var(--color-text-muted)]">
-						{data.activeWorkout.sets.length} sets logged
+					<div class="grid grid-cols-3 gap-3 mt-3">
+						<div>
+							<div class="text-xl font-bold">{data.activeWorkout?.sets.length ?? 0}</div>
+							<div class="text-xs text-[var(--color-text-muted)]">Sets</div>
+						</div>
+						<div>
+							<div class="text-xl font-bold">{workoutUniqueExercises}</div>
+							<div class="text-xs text-[var(--color-text-muted)]">Exercises</div>
+						</div>
+						<div>
+								<div class="text-xl font-bold">{workoutElapsedMin ? `${workoutElapsedMin}m` : '—'}</div>
+							<div class="text-xs text-[var(--color-text-muted)]">Duration</div>
+						</div>
 					</div>
+					{#if workoutTotalVolume > 0}
+						<div class="mt-2 text-sm text-[var(--color-text-muted)]">
+							Total volume: {workoutTotalVolume.toLocaleString()} kg
+						</div>
+					{/if}
 				</div>
 				
 				<div>
