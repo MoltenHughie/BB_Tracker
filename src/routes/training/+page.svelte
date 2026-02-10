@@ -11,11 +11,30 @@
 	let showTemplateModal = $state(false);
 	let showExerciseModal = $state(false);
 	let showFinishModal = $state(false);
+	let showPRModal = $state(false);
 	
 	// Workout state
 	let selectedTemplateId = $state<number | null>(null);
 	let selectedExerciseId = $state<number | null>(null);
 	let currentExercise = $state<typeof data.allExercises[0] | null>(null);
+	let templateExercises = $state<Array<{
+		id: number;
+		name: string;
+		category: string | null;
+		equipment: string | null;
+		targetSets: number | null;
+		targetRepsMin: number | null;
+		targetRepsMax: number | null;
+		sortOrder: number | null;
+	}>>([]);
+	let newPRs = $state<Array<{
+		exerciseId: number;
+		exerciseName: string;
+		recordType: string;
+		value: number;
+		weight?: number;
+		reps?: number;
+	}>>([]);
 	
 	// Set entry state
 	let newWeight = $state<number | null>(null);
@@ -231,19 +250,65 @@
 			{/each}
 		</section>
 		
+		<!-- Template Exercise Checklist (if started from template) -->
+		{#if templateExercises.length > 0}
+			<div class="card">
+				<h3 class="font-semibold mb-3">Template Guide</h3>
+				<div class="space-y-2">
+					{#each templateExercises as te}
+						{@const completed = exercisesInWorkout().some(e => e.exercise.id === te.id)}
+						<button
+							onclick={() => {
+								const ex = data.allExercises.find(e => e.id === te.id);
+								if (ex) selectExercise(ex);
+							}}
+							class="w-full text-left p-2 rounded-lg bg-[var(--color-bg)] hover:bg-[var(--color-surface-hover)] transition-colors {completed ? 'opacity-60' : ''}"
+						>
+							<div class="flex items-center gap-2">
+								<span class="text-lg">{completed ? '✅' : '⭕'}</span>
+								<div class="flex-1">
+									<div class="font-medium text-sm">{te.name}</div>
+									<div class="text-xs text-[var(--color-text-muted)]">
+										{te.targetSets} × {te.targetRepsMin}-{te.targetRepsMax}
+									</div>
+								</div>
+							</div>
+						</button>
+					{/each}
+				</div>
+			</div>
+		{/if}
+
 		<!-- Add Set Section -->
 		<div class="card">
 			<h3 class="font-semibold mb-3">Log Set</h3>
 			
 			{#if currentExercise}
-				<div class="flex items-center justify-between mb-4 p-2 bg-[var(--color-bg)] rounded-lg">
-					<span>{currentExercise.name}</span>
-					<button 
-						onclick={() => showExerciseModal = true}
-						class="text-[var(--color-primary)] text-sm"
-					>
-						Change
-					</button>
+				<div class="mb-4">
+					<div class="flex items-center justify-between p-2 bg-[var(--color-bg)] rounded-lg">
+						<span class="font-medium">{currentExercise.name}</span>
+						<button 
+							onclick={() => showExerciseModal = true}
+							class="text-[var(--color-primary)] text-sm"
+						>
+							Change
+						</button>
+					</div>
+					
+					<!-- Show previous performance if available -->
+					{#if data.previousPerformance && data.previousPerformance[currentExercise.id]}
+						{@const prev = data.previousPerformance[currentExercise.id]}
+						<div class="mt-2 p-2 bg-[var(--color-bg)]/50 rounded-lg text-sm">
+							<div class="text-[var(--color-text-muted)] mb-1">Last time:</div>
+							<div class="flex flex-wrap gap-2">
+								{#each prev as set}
+									<span class="text-xs px-2 py-1 bg-[var(--color-surface)] rounded">
+										{set.weight ?? '—'}kg × {set.reps ?? '—'}{set.rpe ? ` @ ${set.rpe}` : ''}
+									</span>
+								{/each}
+							</div>
+						</div>
+					{/if}
 				</div>
 			{:else}
 				<button 
@@ -442,9 +507,21 @@
 						<div class="space-y-2">
 							{#each data.templates as template}
 								<form method="POST" action="?/startWorkout" use:enhance={() => {
-									return async ({ update }) => {
+									return async ({ result, update }) => {
 										await update();
 										showStartModal = false;
+										
+										// If template exercises were returned, auto-load them
+										if (result.type === 'success' && (result.data as any)?.templateExercises) {
+											templateExercises = (result.data as any).templateExercises;
+											// Auto-select first exercise
+											if (templateExercises.length > 0) {
+												const firstEx = data.allExercises.find(e => e.id === templateExercises[0].id);
+												if (firstEx) {
+													selectExercise(firstEx);
+												}
+											}
+										}
 									};
 								}}>
 									<input type="hidden" name="templateId" value={template.id} />
@@ -561,10 +638,19 @@
 				method="POST" 
 				action="?/finishWorkout"
 				use:enhance={() => {
-					return async ({ update }) => {
+					return async ({ result, update }) => {
 						await update();
 						showFinishModal = false;
 						stopRestTimer();
+						
+						// Check for new PRs
+						if (result.type === 'success' && result.data && 'newPRs' in result.data) {
+							const prs = result.data.newPRs as typeof newPRs;
+							if (prs && Array.isArray(prs) && prs.length > 0) {
+								newPRs = prs;
+								showPRModal = true;
+							}
+						}
 					};
 				}}
 				class="p-4 space-y-4"
@@ -666,6 +752,50 @@
 					<input type="text" name="name" placeholder="Template name" required class="input" />
 					<button type="submit" class="btn btn-primary w-full">Create</button>
 				</form>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- PR Celebration Modal -->
+{#if showPRModal && newPRs.length > 0}
+	<div class="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
+		<div class="bg-[var(--color-surface)] w-full max-w-lg rounded-t-2xl sm:rounded-2xl">
+			<div class="p-4 border-b border-[var(--color-surface-hover)] flex items-center justify-between">
+				<h3 class="text-lg font-semibold">🏆 New Personal Records!</h3>
+				<button onclick={() => showPRModal = false} class="text-2xl">×</button>
+			</div>
+			
+			<div class="p-4 space-y-3">
+				<div class="text-center py-4">
+					<div class="text-6xl mb-3">🏆</div>
+					<div class="text-lg font-semibold">Congratulations!</div>
+					<div class="text-[var(--color-text-muted)]">You set {newPRs.length} new PR{newPRs.length > 1 ? 's' : ''}!</div>
+				</div>
+				
+				<div class="space-y-2">
+					{#each newPRs as pr}
+						<div class="p-3 bg-gradient-to-r from-yellow-500/20 to-transparent rounded-lg border border-yellow-500/30">
+							<div class="font-semibold">{pr.exerciseName}</div>
+							<div class="text-sm text-[var(--color-text-muted)] mt-1">
+								{#if pr.recordType === '1rm'}
+									<span class="font-medium text-yellow-400">Estimated 1RM:</span>
+									{pr.value}kg
+									{#if pr.weight && pr.reps}
+										<span class="text-xs opacity-75">(from {pr.weight}kg × {pr.reps})</span>
+									{/if}
+								{:else if pr.recordType === 'volume'}
+									<span class="font-medium text-yellow-400">Volume PR:</span>
+									{pr.value}kg total
+								{/if}
+							</div>
+						</div>
+					{/each}
+				</div>
+				
+				<button onclick={() => showPRModal = false} class="btn btn-primary w-full">
+					Awesome! 💪
+				</button>
 			</div>
 		</div>
 	</div>

@@ -7,7 +7,7 @@ import {
 	workoutSets,
 	personalRecords
 } from '$lib/server/db/schema';
-import { eq, desc, asc, and, gte, isNull } from 'drizzle-orm';
+import { eq, desc, asc, and, gte, isNull, isNotNull } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 
@@ -64,12 +64,48 @@ export const load: PageServerLoad = async () => {
 		orderBy: [asc(exercises.category), asc(exercises.name)]
 	});
 
+	// Get previous performance data for all exercises (from most recent completed workout)
+	// This helps users see what they did last time
+	const previousPerformance: Record<number, Array<{
+		weight: number | null;
+		reps: number | null;
+		rpe: number | null;
+		setType: string;
+	}>> = {};
+
+	if (activeWorkout) {
+		// Get the most recent COMPLETED workout (not the current active one)
+		const previousWorkout = await db.query.workouts.findFirst({
+			where: isNotNull(workouts.finishedAt),
+			with: {
+				sets: true
+			},
+			orderBy: desc(workouts.finishedAt)
+		});
+
+		if (previousWorkout) {
+			// Group sets by exercise
+			for (const set of previousWorkout.sets) {
+				if (!previousPerformance[set.exerciseId]) {
+					previousPerformance[set.exerciseId] = [];
+				}
+				previousPerformance[set.exerciseId].push({
+					weight: set.weight,
+					reps: set.reps,
+					rpe: set.rpe,
+					setType: set.setType || 'working'
+				});
+			}
+		}
+	}
+
 	return {
 		templates,
 		recentWorkouts,
 		thisWeekWorkouts,
 		activeWorkout,
-		allExercises
+		allExercises,
+		previousPerformance
 	};
 };
 
@@ -84,11 +120,33 @@ export const actions: Actions = {
 		const today = now.split('T')[0];
 
 		let workoutName = name;
+		let templateExercisesList = null;
+
 		if (templateId && !name) {
 			const template = await db.query.workoutTemplates.findFirst({
-				where: eq(workoutTemplates.id, templateId)
+				where: eq(workoutTemplates.id, templateId),
+				with: {
+					exercises: {
+						with: { exercise: true },
+						orderBy: asc(templateExercises.sortOrder)
+					}
+				}
 			});
 			workoutName = template?.name ?? 'Workout';
+			
+			// Return template exercises with target sets/reps for UI
+			if (template?.exercises) {
+				templateExercisesList = template.exercises.map(te => ({
+					id: te.exercise.id,
+					name: te.exercise.name,
+					category: te.exercise.category,
+					equipment: te.exercise.equipment,
+					targetSets: te.targetSets,
+					targetRepsMin: te.targetRepsMin,
+					targetRepsMax: te.targetRepsMax,
+					sortOrder: te.sortOrder
+				}));
+			}
 		}
 
 		const result = await db.insert(workouts).values({
@@ -100,7 +158,11 @@ export const actions: Actions = {
 			createdAt: now
 		}).returning({ id: workouts.id });
 
-		return { success: true, workoutId: result[0].id };
+		return { 
+			success: true, 
+			workoutId: result[0].id,
+			templateExercises: templateExercisesList
+		};
 	},
 
 	// Add a set to the workout
@@ -179,7 +241,10 @@ export const actions: Actions = {
 		}
 
 		const workout = await db.query.workouts.findFirst({
-			where: eq(workouts.id, workoutId)
+			where: eq(workouts.id, workoutId),
+			with: {
+				sets: true
+			}
 		});
 
 		if (!workout) {
@@ -187,6 +252,7 @@ export const actions: Actions = {
 		}
 
 		const now = new Date().toISOString();
+		const today = now.split('T')[0];
 		const startTime = new Date(workout.startedAt).getTime();
 		const endTime = new Date(now).getTime();
 		const durationSeconds = Math.round((endTime - startTime) / 1000);
@@ -200,7 +266,132 @@ export const actions: Actions = {
 			})
 			.where(eq(workouts.id, workoutId));
 
-		return { success: true };
+		// Auto-detect PRs
+		const newPRs: Array<{
+			exerciseId: number;
+			exerciseName: string;
+			recordType: string;
+			value: number;
+			weight?: number;
+			reps?: number;
+		}> = [];
+
+		// Group sets by exercise
+		const exerciseGroups = new Map<number, typeof workout.sets>();
+		for (const set of workout.sets) {
+			if (!exerciseGroups.has(set.exerciseId)) {
+				exerciseGroups.set(set.exerciseId, []);
+			}
+			exerciseGroups.get(set.exerciseId)!.push(set);
+		}
+
+		// Check PRs for each exercise
+		for (const [exerciseId, sets] of exerciseGroups) {
+			// Calculate 1RM PR (using Brzycki formula: weight × (36 / (37 - reps)))
+			// Only for working sets with weight > 0 and reps > 0
+			const workingSets = sets.filter(s => 
+				s.setType === 'working' && 
+				s.weight && s.weight > 0 && 
+				s.reps && s.reps > 0 && 
+				s.reps < 37 // Brzycki formula breaks down at 37+ reps
+			);
+
+			if (workingSets.length > 0) {
+				// Find the best estimated 1RM from this workout
+				let bestEstimated1RM = 0;
+				let bestSet: typeof workingSets[0] | null = null;
+
+				for (const set of workingSets) {
+					const estimated1RM = set.weight! * (36 / (37 - set.reps!));
+					if (estimated1RM > bestEstimated1RM) {
+						bestEstimated1RM = estimated1RM;
+						bestSet = set;
+					}
+				}
+
+				if (bestSet && bestEstimated1RM > 0) {
+					// Check if this is a PR
+					const existingPR = await db.query.personalRecords.findFirst({
+						where: and(
+							eq(personalRecords.exerciseId, exerciseId),
+							eq(personalRecords.recordType, '1rm')
+						),
+						orderBy: desc(personalRecords.value)
+					});
+
+					if (!existingPR || bestEstimated1RM > existingPR.value) {
+						// New PR!
+						await db.insert(personalRecords).values({
+							exerciseId,
+							recordType: '1rm',
+							value: bestEstimated1RM,
+							weight: bestSet.weight,
+							reps: bestSet.reps,
+							workoutSetId: bestSet.id,
+							date: today,
+							createdAt: now
+						});
+
+						// Get exercise name
+						const exercise = await db.query.exercises.findFirst({
+							where: eq(exercises.id, exerciseId)
+						});
+
+						newPRs.push({
+							exerciseId,
+							exerciseName: exercise?.name || 'Unknown',
+							recordType: '1rm',
+							value: Math.round(bestEstimated1RM * 10) / 10,
+							weight: bestSet.weight ?? undefined,
+							reps: bestSet.reps ?? undefined
+						});
+					}
+				}
+			}
+
+			// Calculate volume PR (total weight × reps for this exercise)
+			const totalVolume = sets.reduce((sum, set) => {
+				if (set.weight && set.reps && set.weight > 0 && set.reps > 0) {
+					return sum + (set.weight * set.reps);
+				}
+				return sum;
+			}, 0);
+
+			if (totalVolume > 0) {
+				const existingVolumePR = await db.query.personalRecords.findFirst({
+					where: and(
+						eq(personalRecords.exerciseId, exerciseId),
+						eq(personalRecords.recordType, 'volume')
+					),
+					orderBy: desc(personalRecords.value)
+				});
+
+				if (!existingVolumePR || totalVolume > existingVolumePR.value) {
+					// New volume PR!
+					await db.insert(personalRecords).values({
+						exerciseId,
+						recordType: 'volume',
+						value: totalVolume,
+						date: today,
+						createdAt: now
+					});
+
+					// Get exercise name if not already fetched
+					const exercise = await db.query.exercises.findFirst({
+						where: eq(exercises.id, exerciseId)
+					});
+
+					newPRs.push({
+						exerciseId,
+						exerciseName: exercise?.name || 'Unknown',
+						recordType: 'volume',
+						value: Math.round(totalVolume)
+					});
+				}
+			}
+		}
+
+		return { success: true, newPRs };
 	},
 
 	// Cancel/delete a workout
