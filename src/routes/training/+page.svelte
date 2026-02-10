@@ -49,6 +49,7 @@
 	let newSetType = $state<string>('working');
 	
 	// Rest timer
+	let editingSetId: number | null = $state(null);
 	let restSeconds = $state(0);
 	let restTarget = $state(120);
 	let restTimerActive = $state(false);
@@ -236,14 +237,27 @@
 					<h3 class="font-semibold mb-3">{exercise.name}</h3>
 					<div class="space-y-2">
 						{#each sets as set, i}
+							{@const isEditing = editingSetId === set.id}
 							<div class="flex items-center gap-3 text-sm py-2 border-b border-[var(--color-surface-hover)] last:border-0">
 								<span class="w-8 text-[var(--color-text-muted)]">#{i + 1}</span>
 								<span class="px-2 py-0.5 rounded text-xs bg-[var(--color-bg)]">
 									{set.setType}
 								</span>
-								<span class="flex-1">{set.weight ?? '—'} kg × {set.reps ?? '—'}</span>
-								{#if set.rpe}
-									<span class="text-[var(--color-text-muted)]">RPE {set.rpe}</span>
+								{#if isEditing}
+									<form method="POST" action="?/updateSet" use:enhance={() => { return async ({ update }) => { editingSetId = null; await update(); }; }} class="flex-1 flex items-center gap-2">
+										<input type="hidden" name="setId" value={set.id} />
+										<input type="number" name="weight" value={set.weight ?? ''} step="0.5" placeholder="kg" class="w-16 px-2 py-1 rounded bg-[var(--color-bg)] border border-[var(--color-surface-hover)] text-sm" />
+										<span>×</span>
+										<input type="number" name="reps" value={set.reps ?? ''} placeholder="reps" class="w-14 px-2 py-1 rounded bg-[var(--color-bg)] border border-[var(--color-surface-hover)] text-sm" />
+										<input type="number" name="rpe" value={set.rpe ?? ''} step="0.5" min="1" max="10" placeholder="RPE" class="w-14 px-2 py-1 rounded bg-[var(--color-bg)] border border-[var(--color-surface-hover)] text-sm" />
+										<button type="submit" class="text-green-400 hover:text-green-300 text-lg">✓</button>
+										<button type="button" onclick={() => editingSetId = null} class="text-[var(--color-text-muted)] hover:text-[var(--color-text)]">✕</button>
+									</form>
+								{:else}
+									<button type="button" onclick={() => editingSetId = set.id} class="flex-1 text-left hover:text-[var(--color-primary)] transition-colors" title="Tap to edit">
+										{set.weight ?? '—'} kg × {set.reps ?? '—'}
+										{#if set.rpe}<span class="text-[var(--color-text-muted)] ml-1">RPE {set.rpe}</span>{/if}
+									</button>
 								{/if}
 								<form method="POST" action="?/deleteSet" use:enhance>
 									<input type="hidden" name="setId" value={set.id} />

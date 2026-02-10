@@ -99,4 +99,42 @@
 			{/if}
 		</a>
 	</div>
+
+	<!-- Weekly Overview -->
+	{#if data.weeklyCalories.some(d => d.calories > 0)}
+		<section class="card">
+			<h2 class="text-lg font-semibold mb-3">📅 This Week</h2>
+			<div class="flex items-end gap-1 h-32">
+				{#each data.weeklyCalories as day}
+					{@const maxCal = Math.max(...data.weeklyCalories.map(d => d.calories), data.calorieTarget ?? 1)}
+					{@const pct = maxCal > 0 ? (day.calories / maxCal) * 100 : 0}
+					{@const isToday = day.date === data.today}
+					{@const overTarget = data.calorieTarget ? day.calories > data.calorieTarget : false}
+					<div class="flex-1 flex flex-col items-center gap-1">
+						{#if day.calories > 0}
+							<span class="text-[10px] text-[var(--color-text-muted)]">{day.calories}</span>
+						{/if}
+						<div class="w-full flex flex-col items-center" style="height: 80px;">
+							<div class="flex-1"></div>
+							<div
+								class="w-full max-w-[28px] rounded-t transition-all duration-300 {overTarget ? 'bg-red-500' : isToday ? 'bg-[var(--color-primary)]' : 'bg-[var(--color-primary)]/60'}"
+								style="height: {Math.max(pct > 0 ? 4 : 0, pct * 0.8)}px"
+							></div>
+						</div>
+						{#if day.trained}
+							<span class="text-xs">💪</span>
+						{/if}
+						<span class="text-[10px] {isToday ? 'font-bold text-[var(--color-primary)]' : 'text-[var(--color-text-muted)]'}">{day.dayLabel}</span>
+					</div>
+				{/each}
+			</div>
+			{#if data.calorieTarget}
+				<div class="mt-2 flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
+					<div class="h-px flex-1 bg-[var(--color-surface-hover)]"></div>
+					<span>Target: {data.calorieTarget} kcal</span>
+					<div class="h-px flex-1 bg-[var(--color-surface-hover)]"></div>
+				</div>
+			{/if}
+		</section>
+	{/if}
 </div>

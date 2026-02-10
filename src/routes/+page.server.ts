@@ -9,11 +9,27 @@ import {
 	supplementSchedules,
 	supplements
 } from '$lib/server/db/schema';
-import { eq, desc, isNull } from 'drizzle-orm';
+import { eq, desc, isNull, and, gte, lte } from 'drizzle-orm';
 import type { PageServerLoad } from './$types';
+
+function getWeekDates(): string[] {
+	const dates: string[] = [];
+	const now = new Date();
+	// Start from Monday of current week
+	const day = now.getDay();
+	const monday = new Date(now);
+	monday.setDate(now.getDate() - ((day + 6) % 7));
+	for (let i = 0; i < 7; i++) {
+		const d = new Date(monday);
+		d.setDate(monday.getDate() + i);
+		dates.push(d.toISOString().split('T')[0]);
+	}
+	return dates;
+}
 
 export const load: PageServerLoad = async () => {
 	const today = new Date().toISOString().split('T')[0];
+	const weekDates = getWeekDates();
 
 	// --- Calories ---
 	const todayEntries = await db.query.foodEntries.findMany({
@@ -71,6 +87,25 @@ export const load: PageServerLoad = async () => {
 	const suppsTaken = todayLogs.length;
 	const suppsTotal = todaySchedules.length;
 
+	// --- Weekly overview ---
+	const weekEntries = await db.query.foodEntries.findMany({
+		where: and(gte(foodEntries.date, weekDates[0]), lte(foodEntries.date, weekDates[6]))
+	});
+	const weekWorkouts = await db.query.workouts.findMany({
+		where: and(gte(workouts.date, weekDates[0]), lte(workouts.date, weekDates[6]))
+	});
+
+	const weeklyCalories = weekDates.map(date => {
+		const dayEntries = weekEntries.filter(e => e.date === date);
+		return {
+			date,
+			dayLabel: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][weekDates.indexOf(date)],
+			calories: Math.round(dayEntries.reduce((s, e) => s + (e.calories ?? 0), 0)),
+			protein: Math.round(dayEntries.reduce((s, e) => s + (e.protein ?? 0), 0)),
+			trained: weekWorkouts.some(w => w.date === date)
+		};
+	});
+
 	return {
 		today,
 		calories: {
@@ -94,6 +129,8 @@ export const load: PageServerLoad = async () => {
 		supplements: {
 			taken: suppsTaken,
 			total: suppsTotal
-		}
+		},
+		weeklyCalories,
+		calorieTarget: latestTarget?.calories ?? null
 	};
 };

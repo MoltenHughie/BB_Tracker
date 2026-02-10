@@ -9,7 +9,8 @@
 		{ href: '/calories', label: 'Calories', icon: '🍎' },
 		{ href: '/training', label: 'Training', icon: '💪' },
 		{ href: '/supplements', label: 'Supps', icon: '💊' },
-		{ href: '/body', label: 'Body', icon: '📏' }
+		{ href: '/body', label: 'Body', icon: '📏' },
+		{ href: '/settings', label: 'Settings', icon: '⚙️' }
 	];
 </script>
 
