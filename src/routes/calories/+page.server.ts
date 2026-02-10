@@ -1,6 +1,6 @@
 import { db } from '$lib/server/db';
 import { foods, foodEntries, mealTypes, dailyTargets } from '$lib/server/db/schema';
-import { eq, desc, asc } from 'drizzle-orm';
+import { eq, and, desc, asc } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 
@@ -258,5 +258,51 @@ export const actions: Actions = {
 		}
 
 		return { success: true };
+	},
+
+	// Copy all entries from the previous day
+	copyPreviousDay: async ({ request }) => {
+		const data = await request.formData();
+		const date = data.get('date') as string;
+
+		if (!date) {
+			return fail(400, { error: 'Date is required' });
+		}
+
+		// Calculate previous day
+		const prev = new Date(date);
+		prev.setDate(prev.getDate() - 1);
+		const prevDate = prev.toISOString().split('T')[0];
+
+		// Get previous day's entries
+		const prevEntries = await db.query.foodEntries.findMany({
+			where: eq(foodEntries.date, prevDate)
+		});
+
+		if (prevEntries.length === 0) {
+			return fail(400, { error: 'No entries found for the previous day' });
+		}
+
+		const now = new Date().toISOString();
+
+		// Copy each entry to the current date
+		for (const entry of prevEntries) {
+			await db.insert(foodEntries).values({
+				date,
+				foodId: entry.foodId,
+				mealTypeId: entry.mealTypeId,
+				servingId: entry.servingId,
+				quantity: entry.quantity,
+				customGrams: entry.customGrams,
+				calories: entry.calories,
+				protein: entry.protein,
+				carbs: entry.carbs,
+				fat: entry.fat,
+				loggedAt: now,
+				createdAt: now
+			});
+		}
+
+		return { success: true, copied: prevEntries.length };
 	}
 };

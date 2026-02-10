@@ -202,6 +202,16 @@
 		</div>
 	</div>
 
+	<!-- Copy previous day -->
+	{#if data.entries.length === 0}
+		<form method="POST" action="?/copyPreviousDay" use:enhance>
+			<input type="hidden" name="date" value={data.date} />
+			<button type="submit" class="card w-full text-center hover:bg-[var(--color-surface-hover)] transition-colors text-sm text-[var(--color-text-muted)]">
+				📋 Copy yesterday's entries
+			</button>
+		</form>
+	{/if}
+
 	<!-- Meals list -->
 	<section class="space-y-4">
 		{#each data.meals as meal}

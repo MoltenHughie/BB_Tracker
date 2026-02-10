@@ -44,6 +44,7 @@ async function seed() {
 		{ name: 'Afternoon Snack', sortOrder: 4, icon: '🍎' },
 		{ name: 'Dinner', sortOrder: 5, icon: '🍝' },
 		{ name: 'Evening Snack', sortOrder: 6, icon: '🍫' },
+		{ name: 'Supplements', sortOrder: 7, icon: '💊' },
 	];
 	for (const m of meals) {
 		await db.insert(mealTypes).values(m).onConflictDoNothing();

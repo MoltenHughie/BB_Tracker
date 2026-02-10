@@ -2,7 +2,10 @@ import { db } from '$lib/server/db';
 import { 
 	supplements, 
 	supplementSchedules, 
-	supplementLogs 
+	supplementLogs,
+	foods,
+	foodEntries,
+	mealTypes
 } from '$lib/server/db/schema';
 import { eq, and, desc, asc, gte, lte } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
@@ -127,6 +130,70 @@ export const actions: Actions = {
 
 		const now = new Date().toISOString();
 
+		// Check if supplement has nutritional data for auto-logging to calories
+		let foodEntryId: number | null = null;
+		const supp = await db.query.supplements.findFirst({
+			where: eq(supplements.id, supplementId)
+		});
+
+		if (supp && (supp.calories || supp.protein || supp.carbs || supp.fat)) {
+			// Find or create a food entry for this supplement
+			let foodId: number;
+			const existingFood = await db.query.foods.findFirst({
+				where: and(
+					eq(foods.name, `${supp.name} (supplement)`),
+					eq(foods.source, 'supplement')
+				)
+			});
+
+			if (existingFood) {
+				foodId = existingFood.id;
+			} else {
+				const [newFood] = await db.insert(foods).values({
+					name: `${supp.name} (supplement)`,
+					brand: supp.brand,
+					source: 'supplement',
+					// Store per-serving values as "per 100g" (quantity=1 dose = 1 serving)
+					calories: (supp.calories ?? 0) * 100,
+					protein: (supp.protein ?? 0) * 100,
+					carbs: (supp.carbs ?? 0) * 100,
+					fat: (supp.fat ?? 0) * 100,
+					createdAt: now,
+					updatedAt: now
+				}).returning({ id: foods.id });
+				foodId = newFood.id;
+			}
+
+			// Find "Supplements" meal type or use first available
+			let mealTypeId: number | null = null;
+			const suppMeal = await db.query.mealTypes.findFirst({
+				where: eq(mealTypes.name, 'Supplements')
+			});
+			if (suppMeal) {
+				mealTypeId = suppMeal.id;
+			} else {
+				const snackMeal = await db.query.mealTypes.findFirst({
+					where: eq(mealTypes.name, 'Snacks')
+				});
+				mealTypeId = snackMeal?.id ?? null;
+			}
+
+			// Create calorie entry
+			const [entry] = await db.insert(foodEntries).values({
+				date,
+				mealTypeId,
+				foodId,
+				quantity: dose / 100, // foods stores per-100g, dose is servings
+				calories: (supp.calories ?? 0) * dose,
+				protein: (supp.protein ?? 0) * dose,
+				carbs: (supp.carbs ?? 0) * dose,
+				fat: (supp.fat ?? 0) * dose,
+				loggedAt: now,
+				createdAt: now
+			}).returning({ id: foodEntries.id });
+			foodEntryId = entry.id;
+		}
+
 		await db.insert(supplementLogs).values({
 			supplementId,
 			scheduleId,
@@ -134,6 +201,7 @@ export const actions: Actions = {
 			dose,
 			takenAt: now,
 			notes,
+			foodEntryId,
 			createdAt: now
 		});
 
@@ -165,6 +233,10 @@ export const actions: Actions = {
 		const isPed = data.get('isPed') === 'true';
 		const isRx = data.get('isRx') === 'true';
 		const notes = data.get('notes') as string || null;
+		const calories = data.get('calories') ? parseFloat(data.get('calories') as string) : null;
+		const protein = data.get('protein') ? parseFloat(data.get('protein') as string) : null;
+		const carbs = data.get('carbs') ? parseFloat(data.get('carbs') as string) : null;
+		const fat = data.get('fat') ? parseFloat(data.get('fat') as string) : null;
 
 		if (!name) {
 			return fail(400, { error: 'Name is required' });
@@ -182,6 +254,10 @@ export const actions: Actions = {
 			isPed,
 			isRx,
 			notes,
+			calories,
+			protein,
+			carbs,
+			fat,
 			createdAt: now,
 			updatedAt: now
 		}).returning({ id: supplements.id });
@@ -202,6 +278,10 @@ export const actions: Actions = {
 		const isPed = data.get('isPed') === 'true';
 		const isRx = data.get('isRx') === 'true';
 		const notes = data.get('notes') as string || null;
+		const calories = data.get('calories') ? parseFloat(data.get('calories') as string) : null;
+		const protein = data.get('protein') ? parseFloat(data.get('protein') as string) : null;
+		const carbs = data.get('carbs') ? parseFloat(data.get('carbs') as string) : null;
+		const fat = data.get('fat') ? parseFloat(data.get('fat') as string) : null;
 
 		if (!supplementId || isNaN(supplementId)) {
 			return fail(400, { error: 'Supplement ID is required' });
@@ -224,6 +304,10 @@ export const actions: Actions = {
 				isPed,
 				isRx,
 				notes,
+				calories,
+				protein,
+				carbs,
+				fat,
 				updatedAt: now
 			})
 			.where(eq(supplements.id, supplementId));

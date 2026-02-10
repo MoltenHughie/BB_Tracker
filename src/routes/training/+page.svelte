@@ -12,6 +12,8 @@
 	let showExerciseModal = $state(false);
 	let showFinishModal = $state(false);
 	let showPRModal = $state(false);
+	let showWorkoutDetailModal = $state(false);
+	let selectedWorkout = $state<typeof data.recentWorkouts[0] | null>(null);
 	
 	// Workout state
 	let selectedTemplateId = $state<number | null>(null);
@@ -453,7 +455,7 @@
 			{#if data.recentWorkouts.length > 0}
 				<div class="space-y-2">
 					{#each data.recentWorkouts as workout}
-						<div class="card">
+						<button type="button" onclick={() => { selectedWorkout = workout; showWorkoutDetailModal = true; }} class="card w-full text-left hover:bg-[var(--color-surface-hover)] transition-colors cursor-pointer">
 							<div class="flex items-center justify-between">
 								<div>
 									<div class="font-semibold">{workout.name}</div>
@@ -477,7 +479,7 @@
 									{[...new Set(workout.sets.map(s => s.exercise.name))].length > 3 ? '...' : ''}
 								</div>
 							{/if}
-						</div>
+						</button>
 					{/each}
 				</div>
 			{:else}
@@ -796,6 +798,79 @@
 				<button onclick={() => showPRModal = false} class="btn btn-primary w-full">
 					Awesome! 💪
 				</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Workout Detail Modal -->
+{#if showWorkoutDetailModal && selectedWorkout}
+	{@const exerciseGroups = (() => {
+		const groups: Map<number, { exercise: { name: string; category: string | null }; sets: typeof selectedWorkout.sets }> = new Map();
+		for (const s of selectedWorkout.sets) {
+			if (!groups.has(s.exerciseId)) {
+				groups.set(s.exerciseId, { exercise: s.exercise, sets: [] });
+			}
+			groups.get(s.exerciseId)!.sets.push(s);
+		}
+		return [...groups.values()];
+	})()}
+	<div class="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
+		<div class="bg-[var(--color-surface)] w-full max-w-lg rounded-t-2xl sm:rounded-2xl max-h-[85vh] flex flex-col">
+			<div class="p-4 border-b border-[var(--color-surface-hover)] flex items-center justify-between">
+				<div>
+					<h3 class="text-lg font-semibold">{selectedWorkout.name}</h3>
+					<div class="text-sm text-[var(--color-text-muted)]">
+						{new Date(selectedWorkout.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+						{#if selectedWorkout.durationSeconds}
+							• {formatDuration(selectedWorkout.durationSeconds)}
+						{/if}
+					</div>
+				</div>
+				<button onclick={() => showWorkoutDetailModal = false} class="text-2xl">×</button>
+			</div>
+			<div class="p-4 space-y-4 overflow-y-auto">
+				{#if selectedWorkout.notes}
+					<div class="text-sm text-[var(--color-text-muted)] italic">{selectedWorkout.notes}</div>
+				{/if}
+				
+				{#each exerciseGroups as group}
+					<div>
+						<div class="font-semibold mb-2">{group.exercise.name}
+							{#if group.exercise.category}
+								<span class="text-xs text-[var(--color-text-muted)] font-normal ml-1">{group.exercise.category}</span>
+							{/if}
+						</div>
+						<div class="space-y-1">
+							{#each group.sets as set, i}
+								<div class="flex items-center gap-3 text-sm px-2 py-1 rounded bg-[var(--color-bg)]">
+									<span class="text-[var(--color-text-muted)] w-6 text-right">{i + 1}</span>
+									<span class="flex-1">
+										{#if set.weight != null}{set.weight} kg{/if}
+										{#if set.weight != null && set.reps != null} × {/if}
+										{#if set.reps != null}{set.reps} reps{/if}
+									</span>
+									{#if set.rpe}
+										<span class="text-xs text-[var(--color-text-muted)]">RPE {set.rpe}</span>
+									{/if}
+									{#if set.setType && set.setType !== 'working'}
+										<span class="text-xs px-1.5 py-0.5 rounded bg-[var(--color-surface-hover)]">{set.setType}</span>
+									{/if}
+								</div>
+							{/each}
+						</div>
+					</div>
+				{/each}
+				
+				{#if exerciseGroups.length === 0}
+					<div class="text-center text-[var(--color-text-muted)] py-4">No sets logged</div>
+				{/if}
+
+				{#if selectedWorkout.rating}
+					<div class="text-center text-sm text-[var(--color-text-muted)]">
+						Rating: {'⭐'.repeat(selectedWorkout.rating)}
+					</div>
+				{/if}
 			</div>
 		</div>
 	</div>

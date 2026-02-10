@@ -23,6 +23,10 @@
 	let newIsPed = $state(false);
 	let newIsRx = $state(false);
 	let newNotes = $state('');
+	let newCalories = $state<number | null>(null);
+	let newProtein = $state<number | null>(null);
+	let newCarbs = $state<number | null>(null);
+	let newFat = $state<number | null>(null);
 	
 	// Form states for schedule
 	let schedName = $state('');
@@ -112,6 +116,10 @@
 		newIsPed = false;
 		newIsRx = false;
 		newNotes = '';
+		newCalories = null;
+		newProtein = null;
+		newCarbs = null;
+		newFat = null;
 	}
 	
 	function resetScheduleForm() {
@@ -135,6 +143,10 @@
 	let editIsPed = $state(false);
 	let editIsRx = $state(false);
 	let editNotes = $state('');
+	let editCalories = $state<number | null>(null);
+	let editProtein = $state<number | null>(null);
+	let editCarbs = $state<number | null>(null);
+	let editFat = $state<number | null>(null);
 
 	function openSupplementDetail(supp: typeof data.allSupplements[0]) {
 		selectedSupplement = supp;
@@ -152,6 +164,10 @@
 		editIsPed = supp.isPed ?? false;
 		editIsRx = supp.isRx ?? false;
 		editNotes = supp.notes || '';
+		editCalories = supp.calories ?? null;
+		editProtein = supp.protein ?? null;
+		editCarbs = supp.carbs ?? null;
+		editFat = supp.fat ?? null;
 		editMode = true;
 	}
 
@@ -555,6 +571,29 @@
 					</label>
 				</div>
 				
+				<!-- Nutritional content per serving (for auto-logging to calories) -->
+				<div>
+					<p class="text-sm text-[var(--color-text-muted)] mb-2">Nutrition per serving <span class="text-xs">(optional — auto-logs to calories)</span></p>
+					<div class="grid grid-cols-4 gap-2">
+						<div>
+							<label for="supp-cal" class="block text-xs mb-1">Calories</label>
+							<input id="supp-cal" type="number" name="calories" bind:value={newCalories} class="input text-sm" step="0.1" min="0" placeholder="kcal" />
+						</div>
+						<div>
+							<label for="supp-prot" class="block text-xs mb-1">Protein</label>
+							<input id="supp-prot" type="number" name="protein" bind:value={newProtein} class="input text-sm" step="0.1" min="0" placeholder="g" />
+						</div>
+						<div>
+							<label for="supp-carb" class="block text-xs mb-1">Carbs</label>
+							<input id="supp-carb" type="number" name="carbs" bind:value={newCarbs} class="input text-sm" step="0.1" min="0" placeholder="g" />
+						</div>
+						<div>
+							<label for="supp-fat" class="block text-xs mb-1">Fat</label>
+							<input id="supp-fat" type="number" name="fat" bind:value={newFat} class="input text-sm" step="0.1" min="0" placeholder="g" />
+						</div>
+					</div>
+				</div>
+
 				<div>
 					<label for="supp-notes" class="block text-sm mb-2">Notes</label>
 					<textarea 
@@ -660,6 +699,27 @@
 							<input type="checkbox" name="isRx" bind:checked={editIsRx} value="true" class="w-4 h-4" />
 							<span class="text-sm">Prescription</span>
 						</label>
+					</div>
+					<div>
+						<p class="text-sm text-[var(--color-text-muted)] mb-1">Nutrition per serving <span class="text-xs">(auto-logs to calories)</span></p>
+						<div class="grid grid-cols-4 gap-2">
+							<div>
+								<label for="edit-cal" class="block text-xs mb-1">Cal</label>
+								<input id="edit-cal" type="number" name="calories" bind:value={editCalories} class="input text-sm" step="0.1" min="0" />
+							</div>
+							<div>
+								<label for="edit-prot" class="block text-xs mb-1">Prot</label>
+								<input id="edit-prot" type="number" name="protein" bind:value={editProtein} class="input text-sm" step="0.1" min="0" />
+							</div>
+							<div>
+								<label for="edit-carb" class="block text-xs mb-1">Carbs</label>
+								<input id="edit-carb" type="number" name="carbs" bind:value={editCarbs} class="input text-sm" step="0.1" min="0" />
+							</div>
+							<div>
+								<label for="edit-fat" class="block text-xs mb-1">Fat</label>
+								<input id="edit-fat" type="number" name="fat" bind:value={editFat} class="input text-sm" step="0.1" min="0" />
+							</div>
+						</div>
 					</div>
 					<div>
 						<label for="edit-notes" class="block text-sm mb-1">Notes</label>
