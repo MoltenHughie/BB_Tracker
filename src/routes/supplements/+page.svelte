@@ -124,10 +124,45 @@
 		schedNotes = '';
 	}
 	
+	// Edit supplement states
+	let editMode = $state(false);
+	let editName = $state('');
+	let editBrand = $state('');
+	let editCategory = $state('');
+	let editForm = $state('');
+	let editServingSize = $state('');
+	let editConcentration = $state('');
+	let editIsPed = $state(false);
+	let editIsRx = $state(false);
+	let editNotes = $state('');
+
 	function openSupplementDetail(supp: typeof data.allSupplements[0]) {
 		selectedSupplement = supp;
+		editMode = false;
 		showSupplementDetailModal = true;
 	}
+
+	function startEditSupplement(supp: typeof data.allSupplements[0]) {
+		editName = supp.name;
+		editBrand = supp.brand || '';
+		editCategory = supp.category || '';
+		editForm = supp.form || '';
+		editServingSize = supp.servingSize || '';
+		editConcentration = supp.concentration || '';
+		editIsPed = supp.isPed ?? false;
+		editIsRx = supp.isRx ?? false;
+		editNotes = supp.notes || '';
+		editMode = true;
+	}
+
+	function navigateDate(offset: number) {
+		const current = new Date(data.date);
+		current.setDate(current.getDate() + offset);
+		const newDate = current.toISOString().split('T')[0];
+		window.location.href = `/supplements?date=${newDate}`;
+	}
+
+	const isToday = $derived(data.date === new Date().toISOString().split('T')[0]);
 	
 	function openAddSchedule(supp: typeof data.allSupplements[0] | null) {
 		if (!supp) return;
@@ -148,14 +183,30 @@
 </script>
 
 <div class="space-y-6 pb-4">
-	<header class="flex items-center justify-between">
-		<h1 class="text-2xl font-bold">💊 Supplements</h1>
-		<button 
-			onclick={() => showManualLogModal = true}
-			class="text-[var(--color-text-muted)] text-sm hover:text-[var(--color-text)]"
-		>
-			{data.date}
-		</button>
+	<header class="space-y-2">
+		<div class="flex items-center justify-between">
+			<h1 class="text-2xl font-bold">💊 Supplements</h1>
+			<button 
+				onclick={() => showManualLogModal = true}
+				class="btn btn-secondary text-sm"
+			>
+				+ Quick Log
+			</button>
+		</div>
+		<div class="flex items-center justify-center gap-4">
+			<button onclick={() => navigateDate(-1)} class="text-xl px-2 hover:text-[var(--color-primary)]">‹</button>
+			<button 
+				onclick={() => { if (!isToday) window.location.href = '/supplements'; }}
+				class="text-sm font-medium {isToday ? 'text-[var(--color-primary)]' : 'hover:text-[var(--color-primary)]'}"
+			>
+				{isToday ? 'Today' : data.date}
+			</button>
+			<button 
+				onclick={() => navigateDate(1)} 
+				class="text-xl px-2 hover:text-[var(--color-primary)] {isToday ? 'opacity-30 pointer-events-none' : ''}"
+				disabled={isToday}
+			>›</button>
+		</div>
 	</header>
 
 	<!-- Daily progress card -->
@@ -530,13 +581,97 @@
 			<div class="p-4 border-b border-[var(--color-surface-hover)] flex items-center justify-between">
 				<h3 class="text-lg font-semibold flex items-center gap-2">
 					{getFormEmoji(selectedSupplement.form)}
-					{selectedSupplement.name}
+					{editMode ? 'Edit Supplement' : selectedSupplement.name}
 				</h3>
-				<button onclick={() => showSupplementDetailModal = false} class="text-2xl">×</button>
+				<div class="flex items-center gap-2">
+					{#if !editMode}
+						<button onclick={() => startEditSupplement(selectedSupplement!)} class="text-sm text-[var(--color-primary)]">Edit</button>
+					{/if}
+					<button onclick={() => { showSupplementDetailModal = false; editMode = false; }} class="text-2xl">×</button>
+				</div>
 			</div>
 			
 			<div class="p-4 space-y-4 overflow-y-auto flex-1">
-				<!-- Details -->
+				{#if editMode}
+				<!-- Edit form -->
+				<form 
+					method="POST" 
+					action="?/updateSupplement"
+					use:enhance={() => {
+						return async ({ update }) => {
+							await update();
+							editMode = false;
+							showSupplementDetailModal = false;
+						};
+					}}
+					class="space-y-3"
+				>
+					<input type="hidden" name="supplementId" value={selectedSupplement.id} />
+					<div>
+						<label for="edit-name" class="block text-sm mb-1">Name *</label>
+						<input id="edit-name" type="text" name="name" bind:value={editName} class="input" required />
+					</div>
+					<div>
+						<label for="edit-brand" class="block text-sm mb-1">Brand</label>
+						<input id="edit-brand" type="text" name="brand" bind:value={editBrand} class="input" />
+					</div>
+					<div class="grid grid-cols-2 gap-3">
+						<div>
+							<label for="edit-category" class="block text-sm mb-1">Category</label>
+							<select id="edit-category" name="category" bind:value={editCategory} class="input">
+								<option value="">—</option>
+								<option value="vitamin">Vitamin</option>
+								<option value="mineral">Mineral</option>
+								<option value="protein">Protein</option>
+								<option value="preworkout">Pre-workout</option>
+								<option value="hormone">Hormone</option>
+								<option value="medication">Medication</option>
+								<option value="other">Other</option>
+							</select>
+						</div>
+						<div>
+							<label for="edit-form" class="block text-sm mb-1">Form</label>
+							<select id="edit-form" name="form" bind:value={editForm} class="input">
+								<option value="">—</option>
+								<option value="pill">Pill</option>
+								<option value="capsule">Capsule</option>
+								<option value="powder">Powder</option>
+								<option value="liquid">Liquid</option>
+								<option value="injection">Injection</option>
+							</select>
+						</div>
+					</div>
+					<div class="grid grid-cols-2 gap-3">
+						<div>
+							<label for="edit-serving" class="block text-sm mb-1">Serving size</label>
+							<input id="edit-serving" type="text" name="servingSize" bind:value={editServingSize} class="input" placeholder="e.g. 1 capsule" />
+						</div>
+						<div>
+							<label for="edit-conc" class="block text-sm mb-1">Concentration</label>
+							<input id="edit-conc" type="text" name="concentration" bind:value={editConcentration} class="input" placeholder="e.g. 250mg/ml" />
+						</div>
+					</div>
+					<div class="flex gap-4">
+						<label class="flex items-center gap-2 cursor-pointer">
+							<input type="checkbox" name="isPed" bind:checked={editIsPed} value="true" class="w-4 h-4" />
+							<span class="text-sm">PED</span>
+						</label>
+						<label class="flex items-center gap-2 cursor-pointer">
+							<input type="checkbox" name="isRx" bind:checked={editIsRx} value="true" class="w-4 h-4" />
+							<span class="text-sm">Prescription</span>
+						</label>
+					</div>
+					<div>
+						<label for="edit-notes" class="block text-sm mb-1">Notes</label>
+						<textarea id="edit-notes" name="notes" bind:value={editNotes} class="input h-20 resize-none"></textarea>
+					</div>
+					<div class="flex gap-2">
+						<button type="submit" class="btn btn-primary flex-1">Save</button>
+						<button type="button" onclick={() => editMode = false} class="btn btn-secondary flex-1">Cancel</button>
+					</div>
+				</form>
+				{:else}
+				<!-- Details (view mode) -->
 				<div class="card space-y-2 text-sm">
 					{#if selectedSupplement.brand}
 						<div class="flex justify-between">
@@ -633,8 +768,10 @@
 						</p>
 					{/if}
 				</div>
+				{/if}
 			</div>
 			
+			{#if !editMode}
 			<div class="p-4 border-t border-[var(--color-surface-hover)] flex gap-3">
 				<form 
 					method="POST" 
@@ -669,6 +806,7 @@
 					</button>
 				</form>
 			</div>
+			{/if}
 		</div>
 	</div>
 {/if}
