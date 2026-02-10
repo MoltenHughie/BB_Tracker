@@ -1,6 +1,6 @@
 import { db } from '$lib/server/db';
 import { foods, foodEntries, mealTypes, dailyTargets } from '$lib/server/db/schema';
-import { eq, and, desc, asc } from 'drizzle-orm';
+import { eq, and, desc, asc, gte } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 
@@ -39,6 +39,14 @@ export const load: PageServerLoad = async ({ url }) => {
 		orderBy: asc(foods.name)
 	});
 
+	// Get recently used food IDs (last 7 days) for quick-pick
+	const recentEntries = await db.query.foodEntries.findMany({
+		where: gte(foodEntries.date, new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0]),
+		columns: { foodId: true },
+		orderBy: desc(foodEntries.loggedAt)
+	});
+	const recentFoodIds = [...new Set(recentEntries.map(e => e.foodId))].slice(0, 10);
+
 	// Calculate totals (macros from entries, micros computed from food * quantity)
 	const totals = entries.reduce(
 		(acc, entry) => {
@@ -64,6 +72,7 @@ export const load: PageServerLoad = async ({ url }) => {
 		meals,
 		entries,
 		allFoods,
+		recentFoodIds,
 		totals
 	};
 };

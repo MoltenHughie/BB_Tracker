@@ -27,6 +27,11 @@
 	
 	// Computed
 	const selectedFood = $derived(data.allFoods.find(f => f.id === selectedFoodId));
+	const recentFoods = $derived(
+		data.recentFoodIds
+			.map(id => data.allFoods.find(f => f.id === id))
+			.filter((f): f is NonNullable<typeof f> => f != null)
+	);
 	const filteredFoods = $derived(
 		searchQuery.length > 0
 			? data.allFoods.filter(f => 
@@ -416,6 +421,28 @@
 					</div>
 					
 					{#if searchTab === 'local'}
+						<!-- Recent foods (quick pick) -->
+						{#if recentFoods.length > 0 && searchQuery.length === 0}
+							<div class="mb-3">
+								<div class="text-xs font-medium text-[var(--color-text-muted)] mb-2">⚡ Recent</div>
+								<div class="flex flex-wrap gap-2">
+									{#each recentFoods as food}
+										<button
+											onclick={() => {
+												selectedFoodId = food.id;
+												if (food.servings.length > 0) {
+													const defaultServing = food.servings.find(s => s.isDefault) ?? food.servings[0];
+													selectedServingId = defaultServing.id;
+												}
+											}}
+											class="px-3 py-1.5 rounded-full text-xs bg-[var(--color-bg)] hover:bg-[var(--color-surface-hover)] transition-colors border border-[var(--color-surface-hover)]"
+										>
+											{food.name}
+										</button>
+									{/each}
+								</div>
+							</div>
+						{/if}
 						<!-- Local food list -->
 						<ul class="space-y-2 max-h-60 overflow-y-auto">
 							{#each filteredFoods as food}
