@@ -2,6 +2,7 @@
 	import { enhance } from '$app/forms';
 	
 	let { data } = $props();
+	const weightUnit = $derived(() => (data as any).unitSystem === 'imperial' ? 'lbs' : 'kg');
 	
 	// Modal states
 	let showWeightModal = $state(false);
@@ -75,12 +76,12 @@
 	
 	// Helper functions
 	function formatWeight(kg: number): string {
-		return `${kg.toFixed(1)} kg`;
+		return `${kg.toFixed(1)} ${weightUnit()}`;
 	}
 	
 	function formatTrend(change: number): string {
 		const sign = change >= 0 ? '+' : '';
-		return `${sign}${change.toFixed(1)} kg`;
+		return `${sign}${change.toFixed(1)} ${weightUnit()}`;
 	}
 	
 	function formatDate(dateStr: string): string {
@@ -226,14 +227,14 @@
 			{@const progress = totalRange > 0 ? Math.min(1, Math.max(0, 1 - Math.abs(diff) / totalRange)) : (diff === 0 ? 1 : 0)}
 			<div class="card">
 				<div class="flex items-center justify-between mb-2">
-					<span class="text-sm font-medium">🎯 Goal: {goal.toFixed(1)} kg</span>
+					<span class="text-sm font-medium">🎯 Goal: {goal.toFixed(1)} {weightUnit()}</span>
 					<button onclick={() => { goalInput = data.weightGoal; showGoalModal = true; }} class="text-xs text-[var(--color-text-muted)]">Edit</button>
 				</div>
 				<div class="w-full h-3 bg-[var(--color-bg)] rounded-full overflow-hidden">
 					<div class="h-full bg-[var(--color-primary)] rounded-full transition-all" style="width: {(progress * 100).toFixed(1)}%"></div>
 				</div>
 				<div class="flex justify-between text-xs text-[var(--color-text-muted)] mt-1">
-					<span>{diff > 0 ? `${diff.toFixed(1)} kg to lose` : diff < 0 ? `${(-diff).toFixed(1)} kg to gain` : '🎉 Goal reached!'}</span>
+					<span>{diff > 0 ? `${diff.toFixed(1)} {weightUnit()} to lose` : diff < 0 ? `${(-diff).toFixed(1)} {weightUnit()} to gain` : '🎉 Goal reached!'}</span>
 					<span>{(progress * 100).toFixed(0)}%</span>
 				</div>
 			</div>
@@ -445,7 +446,7 @@
 					{/if}
 					{#if data.latestComposition.muscleMassKg}
 						<div class="text-center">
-							<div class="text-2xl font-bold">{data.latestComposition.muscleMassKg} kg</div>
+							<div class="text-2xl font-bold">{data.latestComposition.muscleMassKg} {weightUnit()}</div>
 							<div class="text-sm text-[var(--color-text-muted)]">Muscle Mass</div>
 						</div>
 					{/if}
@@ -457,7 +458,7 @@
 					{/if}
 					{#if data.latestComposition.boneMassKg}
 						<div class="text-center">
-							<div class="text-2xl font-bold">{data.latestComposition.boneMassKg} kg</div>
+							<div class="text-2xl font-bold">{data.latestComposition.boneMassKg} {weightUnit()}</div>
 							<div class="text-sm text-[var(--color-text-muted)]">Bone Mass</div>
 						</div>
 					{/if}
@@ -501,7 +502,7 @@
 						{/if}
 						{#if mmPoints.length >= 2}
 							<div>
-								<div class="text-xs text-[var(--color-text-muted)] mb-1">Muscle Mass (kg)</div>
+								<div class="text-xs text-[var(--color-text-muted)] mb-1">Muscle Mass ({weightUnit()})</div>
 								<svg viewBox="0 0 300 60" class="w-full h-16" preserveAspectRatio="none">
 									{#each [0, 0.5, 1] as frac}
 										<line x1="0" y1={60 * frac} x2="300" y2={60 * frac} stroke="var(--color-surface-hover)" stroke-width="0.5" />
@@ -509,8 +510,8 @@
 									<path d={sparklinePath(mmPoints, 300, 60)} fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
 								</svg>
 								<div class="flex justify-between text-xs text-[var(--color-text-muted)]">
-									<span>{mmPoints[0]?.value} kg</span>
-									<span>{mmPoints[mmPoints.length - 1]?.value} kg</span>
+									<span>{mmPoints[0]?.value} {weightUnit()}</span>
+									<span>{mmPoints[mmPoints.length - 1]?.value} {weightUnit()}</span>
 								</div>
 							</div>
 						{/if}
@@ -532,7 +533,7 @@
 									<span>BF: {entry.bodyFatPercent}%</span>
 								{/if}
 								{#if entry.muscleMassKg}
-									<span>MM: {entry.muscleMassKg}kg</span>
+									<span>MM: {entry.muscleMassKg}{weightUnit()}</span>
 								{/if}
 							</div>
 							<form method="POST" action="?/deleteComposition" use:enhance>
@@ -707,7 +708,7 @@
 				<input type="hidden" name="date" value={data.date} />
 				
 				<div>
-					<label for="weight" class="block text-sm mb-2">Weight (kg) *</label>
+					<label for="weight" class="block text-sm mb-2">Weight ({weightUnit()}) *</label>
 					<input 
 						id="weight"
 						type="number" 
@@ -933,7 +934,7 @@
 						/>
 					</div>
 					<div>
-						<label for="comp-muscle" class="block text-sm mb-2">Muscle Mass (kg)</label>
+						<label for="comp-muscle" class="block text-sm mb-2">Muscle Mass ({weightUnit()})</label>
 						<input 
 							id="comp-muscle"
 							type="number" 
@@ -964,7 +965,7 @@
 						/>
 					</div>
 					<div>
-						<label for="comp-bone" class="block text-sm mb-2">Bone Mass (kg)</label>
+						<label for="comp-bone" class="block text-sm mb-2">Bone Mass ({weightUnit()})</label>
 						<input 
 							id="comp-bone"
 							type="number" 
@@ -1058,7 +1059,7 @@
 				class="p-4 space-y-4"
 			>
 				<div>
-					<label for="weight-goal" class="block text-sm mb-2">Target Weight (kg)</label>
+					<label for="weight-goal" class="block text-sm mb-2">Target Weight ({weightUnit()})</label>
 					<input 
 						id="weight-goal"
 						type="number" 

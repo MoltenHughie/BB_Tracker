@@ -1,5 +1,6 @@
 <script lang="ts">
 	let { data } = $props();
+	const weightUnit = $derived(() => (data as any).unitSystem === 'imperial' ? 'lbs' : 'kg');
 
 	function formatDate(dateStr: string): string {
 		return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
@@ -27,7 +28,7 @@
 			<div class="grid grid-cols-2 gap-3">
 				{#each data.prs as pr}
 					<div class="bg-[var(--color-bg)] rounded-lg p-3 text-center">
-						<div class="text-xl font-bold">{pr.value}{pr.recordType === '1rm' ? ' kg' : ''}</div>
+						<div class="text-xl font-bold">{pr.value}{pr.recordType === '1rm' ? ` ${weightUnit()}` : ''}</div>
 						<div class="text-xs text-[var(--color-text-muted)] capitalize">{pr.recordType === '1rm' ? 'Est. 1RM' : pr.recordType}</div>
 						<div class="text-xs text-[var(--color-text-muted)]">{formatDate(pr.date)}</div>
 					</div>
@@ -68,7 +69,7 @@
 	{#if data.oneRmHistory.length >= 2}
 		{@const maxVol = Math.max(...data.oneRmHistory.map(d => d.totalVolume))}
 		<div class="card">
-			<h2 class="text-sm font-semibold mb-3">📊 Session Volume (kg)</h2>
+			<h2 class="text-sm font-semibold mb-3">📊 Session Volume</h2>
 			<div class="flex items-end gap-1 h-24">
 				{#each data.oneRmHistory as point}
 					{@const pct = maxVol > 0 ? (point.totalVolume / maxVol) * 100 : 0}
@@ -103,7 +104,7 @@
 						<div class="flex items-center gap-3 text-sm">
 							<span class="text-[var(--color-text-muted)] w-6">#{set.setNumber}</span>
 							<span class="font-mono">
-								{#if set.weight}{set.weight}kg{/if}
+								{#if set.weight}{set.weight}{weightUnit()}{/if}
 								{#if set.weight && set.reps} × {/if}
 								{#if set.reps}{set.reps} reps{/if}
 							</span>

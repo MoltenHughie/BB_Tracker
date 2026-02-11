@@ -29,8 +29,13 @@ export const load: PageServerLoad = async () => {
 
 	const allMealTypes = await db.select().from(mealTypes).orderBy(asc(mealTypes.sortOrder));
 
+	const units = await db.query.appSettings.findFirst({
+		where: eq(appSettings.key, 'unit_system')
+	});
+
 	return {
 		mealTypes: allMealTypes,
+		unitSystem: units?.value === 'imperial' ? 'imperial' : 'metric',
 		stats: {
 			foods: foodCount,
 			foodEntries: entryCount,
@@ -161,6 +166,22 @@ export const actions: Actions = {
 		].join(','));
 		const csv = ['date,workout,exercise,set_number,set_type,weight_kg,reps', ...rows].join('\n');
 		return { csvData: csv, csvName: `bb-training-${new Date().toISOString().split('T')[0]}.csv` };
+	},
+
+	setUnitSystem: async ({ request }) => {
+		const data = await request.formData();
+		const unitSystem = data.get('unitSystem') === 'imperial' ? 'imperial' : 'metric';
+
+		const now = new Date().toISOString();
+		await db
+			.insert(appSettings)
+			.values({ key: 'unit_system', value: unitSystem, updatedAt: now })
+			.onConflictDoUpdate({
+				target: appSettings.key,
+				set: { value: unitSystem, updatedAt: now }
+			});
+
+		return { success: true };
 	},
 
 	importData: async ({ request }) => {

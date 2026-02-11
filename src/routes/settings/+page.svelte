@@ -81,6 +81,23 @@
 		</div>
 	</section>
 
+	<!-- Units -->
+	<section class="card">
+		<div class="flex items-center justify-between gap-4">
+			<div>
+				<h2 class="text-lg font-semibold">📏 Units</h2>
+				<p class="text-sm text-[var(--color-text-muted)]">Choose metric or imperial</p>
+			</div>
+			<form method="POST" action="?/setUnitSystem" use:enhance class="flex items-center gap-2">
+				<select name="unitSystem" class="input text-sm" onchange={(e) => (e.currentTarget.form as HTMLFormElement)?.requestSubmit()}>
+					<option value="metric" selected={data.unitSystem !== 'imperial'}>Metric (kg, cm)</option>
+					<option value="imperial" selected={data.unitSystem === 'imperial'}>Imperial (lbs, inches)</option>
+				</select>
+			</form>
+		</div>
+		<p class="text-xs text-[var(--color-text-muted)] mt-2">This updates unit labels across Training and Body pages.</p>
+	</section>
+
 	<!-- Database Stats -->
 	<section class="card">
 		<h2 class="text-lg font-semibold mb-4">📊 Database Stats</h2>

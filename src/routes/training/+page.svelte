@@ -5,6 +5,7 @@
 	let { data } = $props();
 	
 	const today = new Date().toISOString().split('T')[0];
+	const weightUnit = $derived(() => (data as any).unitSystem === 'imperial' ? 'lbs' : 'kg');
 	
 	// Modal states
 	let showStartModal = $state(false);
@@ -292,7 +293,7 @@
 								{#if isEditing}
 									<form method="POST" action="?/updateSet" use:enhance={() => { return async ({ update }) => { editingSetId = null; await update(); }; }} class="flex-1 flex items-center gap-2">
 										<input type="hidden" name="setId" value={set.id} />
-										<input type="number" name="weight" value={set.weight ?? ''} step="0.5" placeholder="kg" class="w-16 px-2 py-1 rounded bg-[var(--color-bg)] border border-[var(--color-surface-hover)] text-sm" />
+										<input type="number" name="weight" value={set.weight ?? ''} step="0.5" placeholder={weightUnit()} class="w-16 px-2 py-1 rounded bg-[var(--color-bg)] border border-[var(--color-surface-hover)] text-sm" />
 										<span>×</span>
 										<input type="number" name="reps" value={set.reps ?? ''} placeholder="reps" class="w-14 px-2 py-1 rounded bg-[var(--color-bg)] border border-[var(--color-surface-hover)] text-sm" />
 										<input type="number" name="rpe" value={set.rpe ?? ''} step="0.5" min="1" max="10" placeholder="RPE" class="w-14 px-2 py-1 rounded bg-[var(--color-bg)] border border-[var(--color-surface-hover)] text-sm" />
@@ -301,7 +302,7 @@
 									</form>
 								{:else}
 									<button type="button" onclick={() => editingSetId = set.id} class="flex-1 text-left hover:text-[var(--color-primary)] transition-colors" title="Tap to edit">
-										{set.weight ?? '—'} kg × {set.reps ?? '—'}
+										{set.weight ?? '—'} {weightUnit()} × {set.reps ?? '—'}
 										{#if set.rpe}<span class="text-[var(--color-text-muted)] ml-1">RPE {set.rpe}</span>{/if}
 									</button>
 								{/if}
@@ -369,7 +370,7 @@
 							<div class="flex flex-wrap gap-2">
 								{#each prev as set}
 									<span class="text-xs px-2 py-1 bg-[var(--color-surface)] rounded">
-										{set.weight ?? '—'}kg × {set.reps ?? '—'}{set.rpe ? ` @ ${set.rpe}` : ''}
+										{set.weight ?? '—'}{weightUnit()} × {set.reps ?? '—'}{set.rpe ? ` @ ${set.rpe}` : ''}
 									</span>
 								{/each}
 							</div>
@@ -421,7 +422,7 @@
 					<!-- Weight/Reps/RPE inputs -->
 					<div class="grid grid-cols-3 gap-3">
 						<div>
-							<label for="set-weight" class="block text-xs text-[var(--color-text-muted)] mb-1">Weight (kg)</label>
+							<label for="set-weight" class="block text-xs text-[var(--color-text-muted)] mb-1">Weight ({weightUnit()})</label>
 							<input 
 								id="set-weight"
 								type="number" 
@@ -541,7 +542,7 @@
 						<div class="flex items-center justify-between text-sm">
 							<span class="font-medium">{pr.exercise.name}</span>
 							<span class="text-[var(--color-primary)] font-bold">
-								{pr.recordType === '1rm' ? `${pr.value.toFixed(1)} kg (est. 1RM)` : `${pr.value}`}
+								{pr.recordType === '1rm' ? `${pr.value.toFixed(1)} ${weightUnit()} (est. 1RM)` : `${pr.value}`}
 							</span>
 						</div>
 					{/each}
@@ -842,7 +843,7 @@
 					</div>
 					{#if workoutTotalVolume > 0}
 						<div class="mt-2 text-sm text-[var(--color-text-muted)]">
-							Total volume: {workoutTotalVolume.toLocaleString()} kg
+							Total volume: {workoutTotalVolume.toLocaleString()} {weightUnit()}
 						</div>
 					{/if}
 				</div>
@@ -962,13 +963,13 @@
 							<div class="text-sm text-[var(--color-text-muted)] mt-1">
 								{#if pr.recordType === '1rm'}
 									<span class="font-medium text-yellow-400">Estimated 1RM:</span>
-									{pr.value}kg
+									{pr.value}{weightUnit()}
 									{#if pr.weight && pr.reps}
-										<span class="text-xs opacity-75">(from {pr.weight}kg × {pr.reps})</span>
+										<span class="text-xs opacity-75">(from {pr.weight}{weightUnit()} × {pr.reps})</span>
 									{/if}
 								{:else if pr.recordType === 'volume'}
 									<span class="font-medium text-yellow-400">Volume PR:</span>
-									{pr.value}kg total
+									{pr.value}{weightUnit()} total
 								{/if}
 							</div>
 						</div>
@@ -1026,7 +1027,7 @@
 								<div class="flex items-center gap-3 text-sm px-2 py-1 rounded bg-[var(--color-bg)]">
 									<span class="text-[var(--color-text-muted)] w-6 text-right">{i + 1}</span>
 									<span class="flex-1">
-										{#if set.weight != null}{set.weight} kg{/if}
+										{#if set.weight != null}{set.weight} {weightUnit()}{/if}
 										{#if set.weight != null && set.reps != null} × {/if}
 										{#if set.reps != null}{set.reps} reps{/if}
 									</span>

@@ -1,5 +1,6 @@
 <script lang="ts">
 	let { data } = $props();
+	const weightUnit = $derived(() => (data as any).unitSystem === 'imperial' ? 'lbs' : 'kg');
 
 	function formatDuration(seconds: number | null): string {
 		if (!seconds) return '—';
@@ -18,8 +19,8 @@
 	}
 
 	function formatVolume(kg: number): string {
-		if (kg >= 1000) return `${(kg / 1000).toFixed(1)}t`;
-		return `${kg} kg`;
+		if (kg >= 1000) return `${(kg / 1000).toFixed(1)}k${weightUnit()}`;
+		return `${kg} ${weightUnit()}`;
 	}
 </script>
 
