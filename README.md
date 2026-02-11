@@ -2,12 +2,16 @@
 
 Local-only, mobile-first bodybuilding tracker built with SvelteKit 5 + Drizzle ORM + SQLite.
 
-## Features (Planned)
+## Features
 
-- **Calorie Tracker**: Custom foods, OpenFoodFacts lookup, macro/micronutrient tracking
-- **Training Tracker**: Workout splits, exercise library, live workout with rest timer
-- **Supplement Tracker**: Supplements/meds/PEDs, schedules, auto-nutrient logging
-- **Body Tracker**: Weight, measurements, check-in photos (stored on disk)
+- **Calorie Tracker**: Custom foods, OpenFoodFacts search, macro/micronutrient tracking, daily targets, history & charts, copy-previous-day
+- **Training Tracker**: Workout templates, live workout with rest timer (per exercise/set type), PR detection (1RM + volume), exercise history with e1RM charts, workout history
+- **Supplement Tracker**: Supplement library with categories, scheduling system, auto-nutrient logging to calories, 7-day adherence stats, history
+- **Body Tracker**: Weight logging with trend sparklines, body composition, measurements with per-type charts, check-in photos with comparison mode
+- **Food Library**: Browse, search, edit, delete foods + serving management
+- **Dashboard**: Daily overview with calorie/macro progress, training status, supplement adherence, body stats, weekly chart, logging streak
+- **Settings**: Dark/light theme, meal type management, JSON export/import (full backup & restore), database stats
+- **PWA**: Installable as a Progressive Web App (manifest + icons)
 
 ## Tech Stack
 
@@ -19,45 +23,64 @@ Local-only, mobile-first bodybuilding tracker built with SvelteKit 5 + Drizzle O
 ## Development
 
 ```bash
-# Use correct Node version
-nvm use
-
-# Install dependencies
 npm install
-
-# Run dev server
-npm run dev
-
-# Typecheck / Svelte diagnostics
-npm run check
-
-# Build
-npm run build
-
-# Database commands
-npm run db:generate  # Generate migrations
-npm run db:migrate   # Run migrations
-npm run db:studio    # Open Drizzle Studio
+npm run dev          # Dev server (http://localhost:5173)
+npm run check        # Typecheck / Svelte diagnostics
+npm run build        # Production build
+npm run start        # Run production build
 ```
+
+### Database
+
+```bash
+npm run db:generate  # Generate migrations from schema changes
+npm run db:migrate   # Run pending migrations
+npm run db:seed      # Seed default data (meal types, exercises, etc.)
+npm run db:studio    # Open Drizzle Studio (DB browser)
+```
+
+## Production Deployment
+
+### Direct (Node.js)
+
+```bash
+npm run build
+ORIGIN=http://localhost:3000 npm run start
+```
+
+### Docker
+
+```bash
+docker build -t bb-tracker .
+docker run -p 3000:3000 -v bb-data:/app/data bb-tracker
+```
+
+The `-v bb-data:/app/data` flag persists your SQLite database and uploaded photos across container restarts.
 
 ## Project Structure
 
 ```
 src/
-├── app.css              # Global styles + Tailwind
-├── lib/
-│   └── server/db/       # Database schema + connection
+├── app.css                  # Global styles + Tailwind + design tokens
+├── lib/server/db/
+│   ├── schema.ts            # Drizzle schema (20 tables)
+│   ├── index.ts             # DB connection
+│   └── seed.ts              # Default data seeder
 └── routes/
-    ├── +layout.svelte   # Mobile-first shell + bottom nav
-    ├── +page.svelte     # Dashboard
-    ├── calories/        # Calorie tracker module
-    ├── training/        # Training tracker module
-    ├── supplements/     # Supplement tracker module
-    └── body/            # Body tracker module
+    ├── +layout.svelte       # Shell + bottom navigation
+    ├── +page.svelte         # Dashboard
+    ├── calories/            # Calorie tracker + history
+    ├── training/            # Training + exercise history + workout history
+    ├── supplements/         # Supplement tracker + history
+    ├── body/                # Body tracker + measurement trends
+    ├── foods/               # Food library
+    ├── settings/            # App settings + data management
+    └── api/                 # API routes (food search, photo serving)
 ```
 
 ## Data Storage
 
 - All data stored locally in `./data/bb_tracker.sqlite`
-- Photos stored on disk with DB references (not in DB)
+- Photos stored on disk (`./data/uploads/`) with DB references
 - No cloud sync, no accounts — your data stays on your device
+- Full JSON export/import from Settings page
