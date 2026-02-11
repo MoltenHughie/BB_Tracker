@@ -4,7 +4,8 @@ import {
 	measurementTypes,
 	bodyMeasurements, 
 	bodyPhotos,
-	bodyComposition
+	bodyComposition,
+	appSettings
 } from '$lib/server/db/schema';
 import { eq, desc, asc, gte, lte, and } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
@@ -89,6 +90,25 @@ export const load: PageServerLoad = async ({ url }) => {
 		limit: 20
 	});
 
+	// Get measurement history per type (last 15 entries each) for trend charts
+	const measurementHistory: Record<number, { date: string; value: number }[]> = {};
+	for (const type of measureTypes) {
+		const history = await db.query.bodyMeasurements.findMany({
+			where: eq(bodyMeasurements.measurementTypeId, type.id),
+			orderBy: desc(bodyMeasurements.date),
+			limit: 15
+		});
+		if (history.length > 0) {
+			measurementHistory[type.id] = history.map(h => ({ date: h.date, value: h.value }));
+		}
+	}
+
+	// Get weight goal from app_settings
+	const weightGoalSetting = await db.query.appSettings.findFirst({
+		where: eq(appSettings.key, 'weight_goal')
+	});
+	const weightGoal = weightGoalSetting ? parseFloat(weightGoalSetting.value ?? '') : null;
+
 	return {
 		date,
 		weights,
@@ -100,7 +120,9 @@ export const load: PageServerLoad = async ({ url }) => {
 		todayMeasurements,
 		photos,
 		latestComposition,
-		compositionHistory
+		compositionHistory,
+		measurementHistory,
+		weightGoal
 	};
 };
 
@@ -355,6 +377,37 @@ export const actions: Actions = {
 			createdAt: now
 		});
 
+		return { success: true };
+	},
+
+	// Set weight goal
+	setWeightGoal: async ({ request }) => {
+		const data = await request.formData();
+		const goal = data.get('weightGoal') as string;
+		const now = new Date().toISOString();
+
+		if (!goal || goal === '') {
+			// Clear the goal
+			await db.delete(appSettings).where(eq(appSettings.key, 'weight_goal'));
+		} else {
+			const goalNum = parseFloat(goal);
+			if (isNaN(goalNum)) return fail(400, { error: 'Invalid weight goal' });
+			// Upsert
+			const existing = await db.query.appSettings.findFirst({
+				where: eq(appSettings.key, 'weight_goal')
+			});
+			if (existing) {
+				await db.update(appSettings)
+					.set({ value: goalNum.toString(), updatedAt: now })
+					.where(eq(appSettings.key, 'weight_goal'));
+			} else {
+				await db.insert(appSettings).values({
+					key: 'weight_goal',
+					value: goalNum.toString(),
+					updatedAt: now
+				});
+			}
+		}
 		return { success: true };
 	},
 

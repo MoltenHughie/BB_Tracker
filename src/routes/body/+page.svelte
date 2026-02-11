@@ -9,6 +9,7 @@
 	let showCompositionModal = $state(false);
 	let showHistoryModal = $state(false);
 	let showAddTypeModal = $state(false);
+	let showGoalModal = $state(false);
 	
 	// Active tab
 	let activeTab = $state<'weight' | 'measurements' | 'composition' | 'photos'>('weight');
@@ -106,6 +107,26 @@
 		return '📏';
 	}
 	
+	let goalInput = $state<number | null>(null);
+	$effect(() => {
+		if (!showGoalModal) goalInput = data.weightGoal;
+	});
+
+	// Sparkline path helper for measurement history
+	function sparklinePath(points: { date: string; value: number }[], w: number, h: number): string {
+		if (points.length < 2) return '';
+		const sorted = [...points].reverse(); // oldest first
+		const vals = sorted.map(p => p.value);
+		const min = Math.min(...vals) - 0.5;
+		const max = Math.max(...vals) + 0.5;
+		const range = max - min || 1;
+		return sorted.map((p, i) => {
+			const x = (i / (sorted.length - 1)) * w;
+			const y = h - ((p.value - min) / range) * h;
+			return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+		}).join(' ');
+	}
+	
 	function resetWeightForm() {
 		weightValue = data.latestWeight?.weight ?? null;
 		weightTime = '';
@@ -192,6 +213,33 @@
 			</div>
 		</div>
 		
+		<!-- Weight goal -->
+		{#if data.weightGoal && data.latestWeight}
+			{@const current = data.latestWeight.weight}
+			{@const goal = data.weightGoal}
+			{@const diff = current - goal}
+			{@const startWeight = data.weights.length > 0 ? data.weights[data.weights.length - 1].weight : current}
+			{@const totalRange = Math.abs(startWeight - goal)}
+			{@const progress = totalRange > 0 ? Math.min(1, Math.max(0, 1 - Math.abs(diff) / totalRange)) : (diff === 0 ? 1 : 0)}
+			<div class="card">
+				<div class="flex items-center justify-between mb-2">
+					<span class="text-sm font-medium">🎯 Goal: {goal.toFixed(1)} kg</span>
+					<button onclick={() => { goalInput = data.weightGoal; showGoalModal = true; }} class="text-xs text-[var(--color-text-muted)]">Edit</button>
+				</div>
+				<div class="w-full h-3 bg-[var(--color-bg)] rounded-full overflow-hidden">
+					<div class="h-full bg-[var(--color-primary)] rounded-full transition-all" style="width: {(progress * 100).toFixed(1)}%"></div>
+				</div>
+				<div class="flex justify-between text-xs text-[var(--color-text-muted)] mt-1">
+					<span>{diff > 0 ? `${diff.toFixed(1)} kg to lose` : diff < 0 ? `${(-diff).toFixed(1)} kg to gain` : '🎉 Goal reached!'}</span>
+					<span>{(progress * 100).toFixed(0)}%</span>
+				</div>
+			</div>
+		{:else if !data.weightGoal}
+			<button onclick={() => { goalInput = null; showGoalModal = true; }} class="card w-full text-center text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]">
+				🎯 Set a weight goal
+			</button>
+		{/if}
+
 		<!-- Stats row -->
 		{#if data.weights.length > 0}
 			<div class="grid grid-cols-3 gap-3">
@@ -304,6 +352,7 @@
 				<div class="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto">
 					{#each data.measureTypes as type}
 						{@const latest = data.latestMeasurements[type.id]}
+						{@const history = data.measurementHistory[type.id]}
 						<button 
 							onclick={() => {
 								selectedMeasureType = type.id;
@@ -323,6 +372,11 @@
 									—
 								{/if}
 							</div>
+							{#if history && history.length >= 2}
+								<svg viewBox="0 0 80 20" class="w-full h-5 mt-1" preserveAspectRatio="none">
+									<path d={sparklinePath(history, 80, 20)} fill="none" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+								</svg>
+							{/if}
 						</button>
 					{/each}
 				</div>
@@ -418,6 +472,50 @@
 			{/if}
 		</div>
 		
+		<!-- Composition trend chart -->
+		{#if data.compositionHistory.length >= 3}
+			{@const sorted = [...data.compositionHistory].reverse()}
+			{@const bfPoints = sorted.filter(e => e.bodyFatPercent != null).map(e => ({ date: e.date, value: e.bodyFatPercent! }))}
+			{@const mmPoints = sorted.filter(e => e.muscleMassKg != null).map(e => ({ date: e.date, value: e.muscleMassKg! }))}
+			{#if bfPoints.length >= 2 || mmPoints.length >= 2}
+				<section class="card">
+					<h2 class="text-lg font-semibold mb-2">Composition Trend</h2>
+					<div class="space-y-3">
+						{#if bfPoints.length >= 2}
+							<div>
+								<div class="text-xs text-[var(--color-text-muted)] mb-1">Body Fat %</div>
+								<svg viewBox="0 0 300 60" class="w-full h-16" preserveAspectRatio="none">
+									{#each [0, 0.5, 1] as frac}
+										<line x1="0" y1={60 * frac} x2="300" y2={60 * frac} stroke="var(--color-surface-hover)" stroke-width="0.5" />
+									{/each}
+									<path d={sparklinePath(bfPoints, 300, 60)} fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+								</svg>
+								<div class="flex justify-between text-xs text-[var(--color-text-muted)]">
+									<span>{bfPoints[0]?.value}%</span>
+									<span>{bfPoints[bfPoints.length - 1]?.value}%</span>
+								</div>
+							</div>
+						{/if}
+						{#if mmPoints.length >= 2}
+							<div>
+								<div class="text-xs text-[var(--color-text-muted)] mb-1">Muscle Mass (kg)</div>
+								<svg viewBox="0 0 300 60" class="w-full h-16" preserveAspectRatio="none">
+									{#each [0, 0.5, 1] as frac}
+										<line x1="0" y1={60 * frac} x2="300" y2={60 * frac} stroke="var(--color-surface-hover)" stroke-width="0.5" />
+									{/each}
+									<path d={sparklinePath(mmPoints, 300, 60)} fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+								</svg>
+								<div class="flex justify-between text-xs text-[var(--color-text-muted)]">
+									<span>{mmPoints[0]?.value} kg</span>
+									<span>{mmPoints[mmPoints.length - 1]?.value} kg</span>
+								</div>
+							</div>
+						{/if}
+					</div>
+				</section>
+			{/if}
+		{/if}
+
 		<!-- Composition history -->
 		{#if data.compositionHistory.length > 1}
 			<section class="card">
@@ -932,6 +1030,50 @@
 					<p class="text-center text-[var(--color-text-muted)] py-8">No weight entries yet</p>
 				{/if}
 			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Weight Goal Modal -->
+{#if showGoalModal}
+	<div class="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
+		<div class="bg-[var(--color-surface)] w-full max-w-lg rounded-t-2xl sm:rounded-2xl">
+			<div class="p-4 border-b border-[var(--color-surface-hover)] flex items-center justify-between">
+				<h3 class="text-lg font-semibold">Weight Goal</h3>
+				<button onclick={() => showGoalModal = false} class="text-2xl">×</button>
+			</div>
+			
+			<form 
+				method="POST" 
+				action="?/setWeightGoal"
+				use:enhance={() => {
+					return async ({ update }) => {
+						await update();
+						showGoalModal = false;
+					};
+				}}
+				class="p-4 space-y-4"
+			>
+				<div>
+					<label for="weight-goal" class="block text-sm mb-2">Target Weight (kg)</label>
+					<input 
+						id="weight-goal"
+						type="number" 
+						name="weightGoal" 
+						bind:value={goalInput}
+						step="0.1"
+						min="30"
+						max="200"
+						class="input text-2xl text-center"
+						placeholder="70.0"
+					/>
+					<p class="text-xs text-[var(--color-text-muted)] mt-1">Leave empty to clear the goal.</p>
+				</div>
+				
+				<button type="submit" class="btn btn-primary w-full">
+					{goalInput ? 'Set Goal' : 'Clear Goal'}
+				</button>
+			</form>
 		</div>
 	</div>
 {/if}
