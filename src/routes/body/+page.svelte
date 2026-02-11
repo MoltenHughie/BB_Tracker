@@ -13,6 +13,8 @@
 	// Active tab
 	let activeTab = $state<'weight' | 'measurements' | 'composition' | 'photos'>('weight');
 	let showPhotoModal = $state(false);
+	let compareMode = $state(false);
+	let comparePhotos = $state<number[]>([]);
 	
 	// Form states
 	let weightValue = $state<number | null>(null);
@@ -443,25 +445,85 @@
 		{/if}
 	{:else if activeTab === 'photos'}
 		<!-- PHOTOS TAB -->
+
+		<!-- Compare view -->
+		{#if compareMode && comparePhotos.length === 2}
+			{@const photoA = data.photos.find(p => p.id === comparePhotos[0])}
+			{@const photoB = data.photos.find(p => p.id === comparePhotos[1])}
+			<section class="card">
+				<div class="flex items-center justify-between mb-3">
+					<h2 class="text-lg font-semibold">📊 Compare</h2>
+					<button onclick={() => { compareMode = false; comparePhotos = []; }} class="text-sm text-[var(--color-text-muted)]">✕ Close</button>
+				</div>
+				<div class="grid grid-cols-2 gap-2">
+					{#if photoA}
+						<div>
+							<img src="/api/photos/{photoA.filename}" alt="Before" class="w-full aspect-[3/4] object-cover rounded-lg" />
+							<div class="text-xs text-center text-[var(--color-text-muted)] mt-1">
+								{new Date(photoA.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+							</div>
+						</div>
+					{/if}
+					{#if photoB}
+						<div>
+							<img src="/api/photos/{photoB.filename}" alt="After" class="w-full aspect-[3/4] object-cover rounded-lg" />
+							<div class="text-xs text-center text-[var(--color-text-muted)] mt-1">
+								{new Date(photoB.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+							</div>
+						</div>
+					{/if}
+				</div>
+			</section>
+		{/if}
+
 		<section class="card">
 			<div class="flex items-center justify-between mb-3">
 				<h2 class="text-lg font-semibold">Check-in Photos</h2>
-				<button onclick={() => showPhotoModal = true} class="btn btn-secondary text-sm px-3 py-1">
-					+ Upload
-				</button>
+				<div class="flex gap-2">
+					{#if data.photos.length >= 2}
+						<button
+							onclick={() => { compareMode = !compareMode; comparePhotos = []; }}
+							class="text-sm px-3 py-1 rounded-lg transition-colors {compareMode ? 'bg-[var(--color-primary)] text-white' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'}"
+						>
+							{compareMode ? '🔍 Selecting...' : '🔍 Compare'}
+						</button>
+					{/if}
+					<button onclick={() => showPhotoModal = true} class="btn btn-secondary text-sm px-3 py-1">
+						+ Upload
+					</button>
+				</div>
 			</div>
+
+			{#if compareMode}
+				<p class="text-xs text-[var(--color-text-muted)] mb-3">Tap two photos to compare them side by side.</p>
+			{/if}
 			
 			{#if data.photos.length > 0}
 				<div class="grid grid-cols-2 gap-3">
 					{#each data.photos as photo}
+						{@const isSelected = comparePhotos.includes(photo.id)}
 						<div class="relative group">
-							<img
-								src="/api/photos/{photo.filename}"
-								alt="{photo.pose || 'Check-in'} - {photo.date}"
-								class="w-full aspect-[3/4] object-cover rounded-lg"
-								loading="lazy"
-							/>
-							<div class="absolute bottom-0 left-0 right-0 bg-black/60 p-2 rounded-b-lg">
+							<button
+								onclick={() => {
+									if (compareMode) {
+										if (isSelected) {
+											comparePhotos = comparePhotos.filter(id => id !== photo.id);
+										} else if (comparePhotos.length < 2) {
+											comparePhotos = [...comparePhotos, photo.id];
+										}
+									}
+								}}
+								class="w-full text-left"
+								disabled={!compareMode}
+							>
+								<img
+									src="/api/photos/{photo.filename}"
+									alt="{photo.pose || 'Check-in'} - {photo.date}"
+									class="w-full aspect-[3/4] object-cover rounded-lg transition-all {compareMode && isSelected ? 'ring-2 ring-[var(--color-primary)] brightness-110' : ''} {compareMode && !isSelected && comparePhotos.length >= 2 ? 'opacity-40' : ''}"
+									loading="lazy"
+								/>
+							</button>
+							<div class="absolute bottom-0 left-0 right-0 bg-black/60 p-2 rounded-b-lg pointer-events-none">
 								<div class="text-xs text-white">
 									{new Date(photo.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
 								</div>
@@ -469,16 +531,23 @@
 									<div class="text-xs text-white/70 capitalize">{photo.pose.replace('_', ' ')}</div>
 								{/if}
 							</div>
-							<form method="POST" action="?/deletePhoto" use:enhance>
-								<input type="hidden" name="photoId" value={photo.id} />
-								<button
-									type="submit"
-									class="absolute top-2 right-2 w-6 h-6 bg-red-500/80 rounded-full text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-									onclick={(e) => { if (!confirm('Delete this photo?')) e.preventDefault(); }}
-								>
-									×
-								</button>
-							</form>
+							{#if compareMode && isSelected}
+								<div class="absolute top-2 left-2 w-6 h-6 bg-[var(--color-primary)] rounded-full text-white text-xs flex items-center justify-center font-bold">
+									{comparePhotos.indexOf(photo.id) + 1}
+								</div>
+							{/if}
+							{#if !compareMode}
+								<form method="POST" action="?/deletePhoto" use:enhance>
+									<input type="hidden" name="photoId" value={photo.id} />
+									<button
+										type="submit"
+										class="absolute top-2 right-2 w-6 h-6 bg-red-500/80 rounded-full text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+										onclick={(e) => { if (!confirm('Delete this photo?')) e.preventDefault(); }}
+									>
+										×
+									</button>
+								</form>
+							{/if}
 						</div>
 					{/each}
 				</div>

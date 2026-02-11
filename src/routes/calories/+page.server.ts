@@ -313,5 +313,38 @@ export const actions: Actions = {
 		}
 
 		return { success: true, copied: prevEntries.length };
+	},
+
+	editFood: async ({ request }) => {
+		const data = await request.formData();
+		const foodId = parseInt(data.get('foodId') as string);
+		const name = data.get('name') as string;
+		const calories = parseFloat(data.get('calories') as string);
+		const protein = parseFloat(data.get('protein') as string) || 0;
+		const carbs = parseFloat(data.get('carbs') as string) || 0;
+		const fat = parseFloat(data.get('fat') as string) || 0;
+
+		if (!foodId || !name || isNaN(calories)) {
+			return fail(400, { error: 'Food ID, name, and calories are required' });
+		}
+
+		await db.update(foods)
+			.set({ name, calories, protein, carbs, fat, updatedAt: new Date().toISOString() })
+			.where(eq(foods.id, foodId));
+
+		return { success: true };
+	},
+
+	deleteFood: async ({ request }) => {
+		const data = await request.formData();
+		const foodId = parseInt(data.get('foodId') as string);
+
+		if (!foodId) return fail(400, { error: 'Food ID is required' });
+
+		// Delete associated entries first
+		await db.delete(foodEntries).where(eq(foodEntries.foodId, foodId));
+		await db.delete(foods).where(eq(foods.id, foodId));
+
+		return { success: true };
 	}
 };

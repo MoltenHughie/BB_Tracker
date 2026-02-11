@@ -10,6 +10,7 @@
 		{ href: '/training', label: 'Training', icon: '💪' },
 		{ href: '/supplements', label: 'Supps', icon: '💊' },
 		{ href: '/body', label: 'Body', icon: '📏' },
+		{ href: '/foods', label: 'Foods', icon: '📚' },
 		{ href: '/settings', label: 'Settings', icon: '⚙️' }
 	];
 </script>

@@ -64,6 +64,32 @@
 			: null
 	);
 
+	// Elapsed workout timer
+	let elapsedSeconds = $state(0);
+	let elapsedInterval: ReturnType<typeof setInterval> | null = null;
+	const elapsedTime = $derived(() => {
+		const h = Math.floor(elapsedSeconds / 3600);
+		const m = Math.floor((elapsedSeconds % 3600) / 60);
+		const s = elapsedSeconds % 60;
+		return h > 0
+			? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+			: `${m}:${String(s).padStart(2, '0')}`;
+	});
+
+	$effect(() => {
+		if (data.activeWorkout?.startedAt) {
+			const update = () => {
+				elapsedSeconds = Math.floor((Date.now() - new Date(data.activeWorkout!.startedAt).getTime()) / 1000);
+			};
+			update();
+			elapsedInterval = setInterval(update, 1000);
+			return () => { if (elapsedInterval) clearInterval(elapsedInterval); };
+		} else {
+			elapsedSeconds = 0;
+			if (elapsedInterval) { clearInterval(elapsedInterval); elapsedInterval = null; }
+		}
+	});
+
 	let restSeconds = $state(0);
 	let restTarget = $state(120);
 	let restTimerActive = $state(false);
@@ -201,9 +227,12 @@
 		<div class="card bg-gradient-to-r from-[var(--color-primary)]/20 to-transparent border border-[var(--color-primary)]/30">
 			<div class="flex items-center justify-between mb-2">
 				<h2 class="text-lg font-bold">{data.activeWorkout.name}</h2>
-				<span class="text-sm text-[var(--color-text-muted)]">
-					Started {new Date(data.activeWorkout.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-				</span>
+				<div class="text-right">
+					<div class="text-lg font-mono font-bold text-[var(--color-primary)]">{elapsedTime()}</div>
+					<span class="text-xs text-[var(--color-text-muted)]">
+						from {new Date(data.activeWorkout.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+					</span>
+				</div>
 			</div>
 			<div class="flex gap-4">
 				<button 
