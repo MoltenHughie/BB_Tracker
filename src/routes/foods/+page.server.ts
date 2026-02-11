@@ -1,5 +1,5 @@
 import { db } from '$lib/server/db';
-import { foods, foodEntries } from '$lib/server/db/schema';
+import { foods, foodEntries, foodServings } from '$lib/server/db/schema';
 import { eq, desc, sql, like } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
@@ -32,7 +32,27 @@ export const load: PageServerLoad = async ({ url }) => {
 
 	const allFoods = await query.orderBy(desc(foods.updatedAt));
 
-	return { foods: allFoods, search, source };
+	// Load servings for all returned food IDs
+	const foodIds = allFoods.map(f => f.id);
+	const servings = foodIds.length > 0
+		? await db.select().from(foodServings).where(
+			sql`${foodServings.foodId} IN (${sql.join(foodIds.map(id => sql`${id}`), sql`, `)})`
+		)
+		: [];
+
+	const servingsByFood = new Map<number, typeof servings>();
+	for (const s of servings) {
+		const arr = servingsByFood.get(s.foodId) ?? [];
+		arr.push(s);
+		servingsByFood.set(s.foodId, arr);
+	}
+
+	const foodsWithServings = allFoods.map(f => ({
+		...f,
+		servings: servingsByFood.get(f.id) ?? []
+	}));
+
+	return { foods: foodsWithServings, search, source };
 };
 
 export const actions: Actions = {
@@ -69,6 +89,29 @@ export const actions: Actions = {
 		await db.delete(foodEntries).where(eq(foodEntries.foodId, foodId));
 		await db.delete(foods).where(eq(foods.id, foodId));
 
+		return { success: true };
+	},
+
+	addServing: async ({ request }) => {
+		const data = await request.formData();
+		const foodId = parseInt(data.get('foodId') as string);
+		const name = data.get('name') as string;
+		const grams = parseFloat(data.get('grams') as string);
+
+		if (!foodId || !name || isNaN(grams) || grams <= 0) {
+			return fail(400, { error: 'Food ID, name, and grams are required' });
+		}
+
+		await db.insert(foodServings).values({ foodId, name, grams });
+		return { success: true };
+	},
+
+	deleteServing: async ({ request }) => {
+		const data = await request.formData();
+		const servingId = parseInt(data.get('servingId') as string);
+		if (!servingId) return fail(400, { error: 'Serving ID required' });
+
+		await db.delete(foodServings).where(eq(foodServings.id, servingId));
 		return { success: true };
 	},
 

@@ -111,6 +111,36 @@
 							<button type="button" onclick={() => editingId = null} class="btn btn-secondary text-sm flex-1">Cancel</button>
 						</div>
 					</form>
+
+					<!-- Serving sizes -->
+					<div class="mt-4 pt-3 border-t border-[var(--color-surface-hover)]">
+						<h4 class="text-sm font-medium mb-2">Serving sizes</h4>
+						{#if food.servings.length > 0}
+							<div class="space-y-1 mb-3">
+								{#each food.servings as serving}
+									<div class="flex items-center justify-between text-sm py-1">
+										<span>{serving.name} ({serving.grams}g)</span>
+										<form method="POST" action="?/deleteServing" use:enhance>
+											<input type="hidden" name="servingId" value={serving.id} />
+											<button type="submit" class="text-red-400 hover:text-red-300 text-xs">×</button>
+										</form>
+									</div>
+								{/each}
+							</div>
+						{:else}
+							<p class="text-xs text-[var(--color-text-muted)] mb-2">No serving sizes defined.</p>
+						{/if}
+						<form method="POST" action="?/addServing" use:enhance class="flex gap-2 items-end">
+							<input type="hidden" name="foodId" value={food.id} />
+							<div class="flex-1">
+								<input type="text" name="name" required placeholder="e.g., 1 slice" class="input text-sm" />
+							</div>
+							<div class="w-20">
+								<input type="number" name="grams" required min="1" step="0.1" placeholder="g" class="input text-sm" />
+							</div>
+							<button type="submit" class="btn btn-secondary text-sm px-2 py-1">+</button>
+						</form>
+					</div>
 				{:else}
 					<!-- Display -->
 					<button
