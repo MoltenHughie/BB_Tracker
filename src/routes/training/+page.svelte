@@ -18,6 +18,10 @@
 	let createExName = $state('');
 	let createExCategory = $state('other');
 	let createExEquipment = $state('other');
+	let createRestWarmup = $state(60);
+	let createRestWorking = $state(120);
+	let createRestDropset = $state(30);
+	let createRestFailure = $state(180);
 	let selectedWorkout = $state<typeof data.recentWorkouts[0] | null>(null);
 	
 	// Workout state
@@ -746,6 +750,10 @@
 								createExName = '';
 								createExCategory = 'other';
 								createExEquipment = 'other';
+								createRestWarmup = 60;
+								createRestWorking = 120;
+								createRestDropset = 30;
+								createRestFailure = 180;
 							};
 						}}
 						class="mt-3 p-3 rounded-lg bg-[var(--color-bg)] space-y-2"
@@ -772,6 +780,27 @@
 								<option value="bodyweight">Bodyweight</option>
 								<option value="other">Other</option>
 							</select>
+						</div>
+						<div>
+							<div class="text-xs text-[var(--color-text-muted)] mb-2">⏱️ Rest timers (seconds)</div>
+							<div class="grid grid-cols-2 gap-2">
+								<label class="text-xs text-[var(--color-text-muted)]">
+									Warmup
+									<input type="number" name="restWarmup" bind:value={createRestWarmup} min="0" step="5" class="input text-sm mt-1" />
+								</label>
+								<label class="text-xs text-[var(--color-text-muted)]">
+									Working
+									<input type="number" name="restWorking" bind:value={createRestWorking} min="0" step="5" class="input text-sm mt-1" />
+								</label>
+								<label class="text-xs text-[var(--color-text-muted)]">
+									Dropset
+									<input type="number" name="restDropset" bind:value={createRestDropset} min="0" step="5" class="input text-sm mt-1" />
+								</label>
+								<label class="text-xs text-[var(--color-text-muted)]">
+									Failure
+									<input type="number" name="restFailure" bind:value={createRestFailure} min="0" step="5" class="input text-sm mt-1" />
+								</label>
+							</div>
 						</div>
 						<div class="flex gap-2">
 							<button type="submit" class="btn btn-primary flex-1 text-sm">Add</button>

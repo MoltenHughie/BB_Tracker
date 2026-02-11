@@ -1,8 +1,8 @@
 import { db } from '$lib/server/db';
 import { exercises, workoutSets, workouts, personalRecords } from '$lib/server/db/schema';
-import { eq, desc, asc, and, isNotNull } from 'drizzle-orm';
-import { error } from '@sveltejs/kit';
-import type { PageServerLoad } from './$types';
+import { eq, desc, asc } from 'drizzle-orm';
+import { error, fail } from '@sveltejs/kit';
+import type { PageServerLoad, Actions } from './$types';
 
 export const load: PageServerLoad = async ({ params }) => {
 	const exerciseId = parseInt(params.id);
@@ -85,4 +85,42 @@ export const load: PageServerLoad = async ({ params }) => {
 		oneRmHistory,
 		prs
 	};
+};
+
+export const actions: Actions = {
+	updateExercise: async ({ request, params }) => {
+		const exerciseId = parseInt(params.id);
+		if (isNaN(exerciseId)) return fail(400, { error: 'Invalid exercise ID' });
+
+		const data = await request.formData();
+		const name = (data.get('name') as string | null)?.trim();
+		const category = (data.get('category') as string | null) ?? null;
+		const equipment = (data.get('equipment') as string | null) ?? null;
+		const notes = (data.get('notes') as string | null) ?? null;
+
+		const restWarmup = data.get('restWarmup') ? parseInt(data.get('restWarmup') as string) : null;
+		const restWorking = data.get('restWorking') ? parseInt(data.get('restWorking') as string) : null;
+		const restDropset = data.get('restDropset') ? parseInt(data.get('restDropset') as string) : null;
+		const restFailure = data.get('restFailure') ? parseInt(data.get('restFailure') as string) : null;
+
+		if (!name) return fail(400, { error: 'Name is required' });
+
+		const now = new Date().toISOString();
+		await db
+			.update(exercises)
+			.set({
+				name,
+				category,
+				equipment,
+				notes,
+				restWarmup: restWarmup ?? undefined,
+				restWorking: restWorking ?? undefined,
+				restDropset: restDropset ?? undefined,
+				restFailure: restFailure ?? undefined,
+				updatedAt: now
+			})
+			.where(eq(exercises.id, exerciseId));
+
+		return { success: true };
+	}
 };

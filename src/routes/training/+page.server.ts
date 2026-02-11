@@ -520,8 +520,13 @@ export const actions: Actions = {
 	createExercise: async ({ request }) => {
 		const data = await request.formData();
 		const name = data.get('name') as string;
-		const category = data.get('category') as string || 'other';
-		const equipment = data.get('equipment') as string || 'other';
+		const category = (data.get('category') as string) || 'other';
+		const equipment = (data.get('equipment') as string) || 'other';
+
+		const restWarmup = data.get('restWarmup') ? parseInt(data.get('restWarmup') as string) : 60;
+		const restWorking = data.get('restWorking') ? parseInt(data.get('restWorking') as string) : 120;
+		const restDropset = data.get('restDropset') ? parseInt(data.get('restDropset') as string) : 30;
+		const restFailure = data.get('restFailure') ? parseInt(data.get('restFailure') as string) : 180;
 
 		if (!name?.trim()) {
 			return fail(400, { error: 'Exercise name is required' });
@@ -533,10 +538,10 @@ export const actions: Actions = {
 			name: name.trim(),
 			category,
 			equipment,
-			restWorking: 120,
-			restWarmup: 60,
-			restDropset: 30,
-			restFailure: 180,
+			restWarmup: Number.isFinite(restWarmup) ? restWarmup : 60,
+			restWorking: Number.isFinite(restWorking) ? restWorking : 120,
+			restDropset: Number.isFinite(restDropset) ? restDropset : 30,
+			restFailure: Number.isFinite(restFailure) ? restFailure : 180,
 			createdAt: now,
 			updatedAt: now
 		});
