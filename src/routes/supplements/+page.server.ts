@@ -232,6 +232,9 @@ export const actions: Actions = {
 				protein: (supp.protein ?? 0) * dose,
 				carbs: (supp.carbs ?? 0) * dose,
 				fat: (supp.fat ?? 0) * dose,
+				fiber: 0,
+				sugar: 0,
+				sodium: 0,
 				loggedAt: now,
 				createdAt: now
 			}).returning({ id: foodEntries.id });

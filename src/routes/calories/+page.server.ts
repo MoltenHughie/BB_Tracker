@@ -350,6 +350,9 @@ export const actions: Actions = {
 				protein: entry.protein,
 				carbs: entry.carbs,
 				fat: entry.fat,
+				fiber: entry.fiber,
+				sugar: entry.sugar,
+				sodium: entry.sodium,
 				loggedAt: now,
 				createdAt: now
 			});
