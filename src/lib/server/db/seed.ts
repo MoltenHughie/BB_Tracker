@@ -21,6 +21,7 @@ async function seed() {
 	// =========================================================================
 	console.log('📝 App settings...');
 	const settings = [
+		{ key: 'unit_system', value: 'metric' }, // 'metric' | 'imperial'
 		{ key: 'weight_unit', value: 'kg' },
 		{ key: 'height_unit', value: 'cm' },
 		{ key: 'measurement_unit', value: 'cm' },
