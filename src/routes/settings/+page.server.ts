@@ -6,7 +6,7 @@ import {
 	bodyWeights, bodyMeasurements, measurementTypes, bodyComposition, bodyPhotos,
 	appSettings
 } from '$lib/server/db/schema';
-import { count } from 'drizzle-orm';
+import { count, eq, asc } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 
@@ -27,7 +27,10 @@ export const load: PageServerLoad = async () => {
 		db.select({ c: count() }).from(bodyMeasurements).then(r => r[0].c),
 	]);
 
+	const allMealTypes = await db.select().from(mealTypes).orderBy(asc(mealTypes.sortOrder));
+
 	return {
+		mealTypes: allMealTypes,
 		stats: {
 			foods: foodCount,
 			foodEntries: entryCount,
@@ -69,6 +72,42 @@ export const actions: Actions = {
 		};
 
 		return { exportJson: JSON.stringify(data, null, 2) };
+	},
+
+	addMealType: async ({ request }) => {
+		const data = await request.formData();
+		const name = data.get('name') as string;
+		const icon = data.get('icon') as string || '🍽️';
+		const sortOrder = parseInt(data.get('sortOrder') as string) || 99;
+
+		if (!name) return fail(400, { error: 'Name is required' });
+
+		await db.insert(mealTypes).values({ name, icon, sortOrder }).onConflictDoNothing();
+		return { success: true };
+	},
+
+	deleteMealType: async ({ request }) => {
+		const data = await request.formData();
+		const id = parseInt(data.get('id') as string);
+		if (!id) return fail(400, { error: 'ID required' });
+
+		// Nullify references in food entries
+		await db.update(foodEntries).set({ mealTypeId: null }).where(eq(foodEntries.mealTypeId, id));
+		await db.delete(mealTypes).where(eq(mealTypes.id, id));
+		return { success: true };
+	},
+
+	editMealType: async ({ request }) => {
+		const data = await request.formData();
+		const id = parseInt(data.get('id') as string);
+		const name = data.get('name') as string;
+		const icon = data.get('icon') as string || '🍽️';
+		const sortOrder = parseInt(data.get('sortOrder') as string) || 99;
+
+		if (!id || !name) return fail(400, { error: 'ID and name required' });
+
+		await db.update(mealTypes).set({ name, icon, sortOrder }).where(eq(mealTypes.id, id));
+		return { success: true };
 	},
 
 	importData: async ({ request }) => {
