@@ -39,6 +39,9 @@
 					{data.calories.protein}g protein{#if data.calories.proteinTarget} / {data.calories.proteinTarget}g{/if}
 				</div>
 			{/if}
+			{#if data.calories.avg7d}
+				<div class="text-xs text-[var(--color-text-muted)]">7d avg: {data.calories.avg7d}</div>
+			{/if}
 			{#if data.calories.target}
 				<div class="mt-2 h-1.5 rounded-full bg-[var(--color-bg)] overflow-hidden">
 					<div
@@ -95,7 +98,11 @@
 				<div class="text-xl font-bold">{data.body.weight} kg</div>
 				<div class="text-xs text-[var(--color-text-muted)] mt-1">
 					{data.body.date === data.today ? 'Today' : new Date(data.body.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+					{#if data.body.bodyFat} • {data.body.bodyFat}% BF{/if}
 				</div>
+				{#if data.body.weightGoal}
+					<div class="text-xs text-[var(--color-text-muted)]">🎯 {data.body.weightGoal} kg</div>
+				{/if}
 			{:else}
 				<div class="text-xl font-bold">— kg</div>
 				<div class="text-xs text-[var(--color-text-muted)] mt-1">No entries yet</div>

@@ -5,9 +5,11 @@ import {
 	workouts,
 	workoutSets,
 	bodyWeights,
+	bodyComposition,
 	supplementLogs,
 	supplementSchedules,
-	supplements
+	supplements,
+	appSettings
 } from '$lib/server/db/schema';
 import { eq, desc, isNull, and, gte, lte } from 'drizzle-orm';
 import type { PageServerLoad } from './$types';
@@ -60,9 +62,16 @@ export const load: PageServerLoad = async () => {
 			})
 		: null;
 
-	// --- Body weight ---
+	// --- Body weight + goal + composition ---
 	const latestWeight = await db.query.bodyWeights.findFirst({
 		orderBy: desc(bodyWeights.date)
+	});
+	const weightGoalSetting = await db.query.appSettings.findFirst({
+		where: eq(appSettings.key, 'weight_goal')
+	});
+	const weightGoal = weightGoalSetting ? parseFloat(weightGoalSetting.value ?? '') : null;
+	const latestComposition = await db.query.bodyComposition.findFirst({
+		orderBy: desc(bodyComposition.date)
 	});
 
 	// --- Supplements ---
@@ -86,6 +95,19 @@ export const load: PageServerLoad = async () => {
 	});
 	const suppsTaken = todayLogs.length;
 	const suppsTotal = todaySchedules.length;
+
+	// --- 7-day calorie rolling average ---
+	const sevenDaysAgo = new Date();
+	sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+	const recentEntries = await db.query.foodEntries.findMany({
+		where: and(gte(foodEntries.date, sevenDaysAgo.toISOString().split('T')[0]), lte(foodEntries.date, today))
+	});
+	const dailyTotals = new Map<string, number>();
+	for (const e of recentEntries) {
+		dailyTotals.set(e.date, (dailyTotals.get(e.date) ?? 0) + (e.calories ?? 0));
+	}
+	const daysWithEntries = [...dailyTotals.values()].filter(v => v > 0);
+	const calAvg7d = daysWithEntries.length > 0 ? Math.round(daysWithEntries.reduce((a, b) => a + b, 0) / daysWithEntries.length) : null;
 
 	// --- Weekly overview ---
 	const weekEntries = await db.query.foodEntries.findMany({
@@ -140,7 +162,8 @@ export const load: PageServerLoad = async () => {
 			eaten: Math.round(caloriesEaten),
 			target: latestTarget?.calories ?? null,
 			protein: Math.round(proteinEaten),
-			proteinTarget: latestTarget?.protein ?? null
+			proteinTarget: latestTarget?.protein ?? null,
+			avg7d: calAvg7d
 		},
 		training: {
 			active: activeWorkout
@@ -152,7 +175,9 @@ export const load: PageServerLoad = async () => {
 		},
 		body: {
 			weight: latestWeight?.weight ?? null,
-			date: latestWeight?.date ?? null
+			date: latestWeight?.date ?? null,
+			weightGoal: weightGoal,
+			bodyFat: latestComposition?.bodyFatPercent ?? null
 		},
 		supplements: {
 			taken: suppsTaken,
