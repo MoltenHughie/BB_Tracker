@@ -110,6 +110,59 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
+	exportCaloriesCSV: async () => {
+		const entries = await db.select({
+			date: foodEntries.date,
+			foodName: foods.name,
+			quantity: foodEntries.quantity,
+			calories: foodEntries.calories,
+			protein: foodEntries.protein,
+			carbs: foodEntries.carbs,
+			fat: foodEntries.fat,
+		}).from(foodEntries)
+			.leftJoin(foods, eq(foodEntries.foodId, foods.id))
+			.orderBy(asc(foodEntries.date));
+
+		const rows = entries.map(e => [
+			e.date,
+			`"${(e.foodName ?? '').replace(/"/g, '""')}"`,
+			e.quantity ?? 1,
+			Math.round(e.calories ?? 0),
+			Math.round((e.protein ?? 0) * 10) / 10,
+			Math.round((e.carbs ?? 0) * 10) / 10,
+			Math.round((e.fat ?? 0) * 10) / 10
+		].join(','));
+		const csv = ['date,food,quantity,calories,protein_g,carbs_g,fat_g', ...rows].join('\n');
+		return { csvData: csv, csvName: `bb-calories-${new Date().toISOString().split('T')[0]}.csv` };
+	},
+
+	exportTrainingCSV: async () => {
+		const sets = await db.select({
+			date: workouts.startedAt,
+			workoutName: workouts.name,
+			exerciseName: exercises.name,
+			setNumber: workoutSets.setNumber,
+			setType: workoutSets.setType,
+			weight: workoutSets.weight,
+			reps: workoutSets.reps,
+		}).from(workoutSets)
+			.leftJoin(workouts, eq(workoutSets.workoutId, workouts.id))
+			.leftJoin(exercises, eq(workoutSets.exerciseId, exercises.id))
+			.orderBy(asc(workouts.startedAt), asc(workoutSets.setNumber));
+
+		const rows = sets.map(s => [
+			s.date ? s.date.split('T')[0] : '',
+			`"${(s.workoutName ?? '').replace(/"/g, '""')}"`,
+			`"${(s.exerciseName ?? '').replace(/"/g, '""')}"`,
+			s.setNumber,
+			s.setType ?? 'working',
+			s.weight ?? '',
+			s.reps ?? ''
+		].join(','));
+		const csv = ['date,workout,exercise,set_number,set_type,weight_kg,reps', ...rows].join('\n');
+		return { csvData: csv, csvName: `bb-training-${new Date().toISOString().split('T')[0]}.csv` };
+	},
+
 	importData: async ({ request }) => {
 		const form = await request.formData();
 		const file = form.get('backup');

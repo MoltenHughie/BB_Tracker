@@ -6,18 +6,25 @@
 	
 	let currentTheme = $state(browser ? (localStorage.getItem('bb-theme') ?? 'dark') : 'dark');
 
-	// Handle export download
+	// Handle export downloads
 	$effect(() => {
 		if (form?.exportJson) {
-			const blob = new Blob([form.exportJson], { type: 'application/json' });
-			const url = URL.createObjectURL(blob);
-			const a = document.createElement('a');
-			a.href = url;
-			a.download = `bb-tracker-export-${new Date().toISOString().split('T')[0]}.json`;
-			a.click();
-			URL.revokeObjectURL(url);
+			downloadFile(form.exportJson, `bb-tracker-export-${new Date().toISOString().split('T')[0]}.json`, 'application/json');
+		}
+		if (form?.csvData && form?.csvName) {
+			downloadFile(form.csvData, form.csvName, 'text/csv');
 		}
 	});
+
+	function downloadFile(content: string, filename: string, type: string) {
+		const blob = new Blob([content], { type });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = filename;
+		a.click();
+		URL.revokeObjectURL(url);
+	}
 
 	const alert = $derived(
 		form?.error
@@ -140,6 +147,25 @@
 				</form>
 				<p class="text-xs text-[var(--color-text-muted)]">
 					Downloads a complete backup of all your data as a JSON file.
+				</p>
+			</div>
+
+			<div class="border-t border-[var(--color-border)] pt-5 space-y-3">
+				<h3 class="font-semibold">CSV Exports (for spreadsheets)</h3>
+				<div class="flex gap-2">
+					<form method="POST" action="?/exportCaloriesCSV" use:enhance class="flex-1">
+						<button type="submit" class="btn-secondary w-full text-sm">
+							🍎 Calories CSV
+						</button>
+					</form>
+					<form method="POST" action="?/exportTrainingCSV" use:enhance class="flex-1">
+						<button type="submit" class="btn-secondary w-full text-sm">
+							💪 Training CSV
+						</button>
+					</form>
+				</div>
+				<p class="text-xs text-[var(--color-text-muted)]">
+					Export calorie entries or training sets as CSV for analysis in Excel/Sheets.
 				</p>
 			</div>
 
