@@ -58,9 +58,10 @@ export const load: PageServerLoad = async ({ url }) => {
 				protein: acc.protein + (entry.protein || 0),
 				carbs: acc.carbs + (entry.carbs || 0),
 				fat: acc.fat + (entry.fat || 0),
-				fiber: acc.fiber + ((food.fiber ?? 0) / 100 * grams * qty),
-				sugar: acc.sugar + ((food.sugar ?? 0) / 100 * grams * qty),
-				sodium: acc.sodium + ((food.sodium ?? 0) / 100 * grams * qty),
+				// Prefer micros captured at log-time; fall back to computing from current food data.
+				fiber: acc.fiber + (entry.fiber ?? ((food.fiber ?? 0) / 100 * grams * qty)),
+				sugar: acc.sugar + (entry.sugar ?? ((food.sugar ?? 0) / 100 * grams * qty)),
+				sodium: acc.sodium + (entry.sodium ?? ((food.sodium ?? 0) / 100 * grams * qty)),
 			};
 		},
 		{ calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0, sodium: 0 }
@@ -154,6 +155,9 @@ export const actions: Actions = {
 			protein: food.protein * multiplier,
 			carbs: food.carbs * multiplier,
 			fat: food.fat * multiplier,
+			fiber: (food.fiber ?? 0) * multiplier,
+			sugar: (food.sugar ?? 0) * multiplier,
+			sodium: (food.sodium ?? 0) * multiplier,
 			loggedAt: now,
 			createdAt: now
 		});
@@ -199,22 +203,32 @@ export const actions: Actions = {
 		const food = entry.food;
 		// Calculate per-unit values (based on serving or 100g)
 		let baseCalories: number, baseProtein: number, baseCarbs: number, baseFat: number;
+		let baseFiber: number, baseSugar: number, baseSodium: number;
 		if (entry.serving) {
 			const grams = entry.serving.grams ?? 100;
 			baseCalories = (food.calories / 100) * grams;
 			baseProtein = (food.protein / 100) * grams;
 			baseCarbs = (food.carbs / 100) * grams;
 			baseFat = (food.fat / 100) * grams;
+			baseFiber = ((food.fiber ?? 0) / 100) * grams;
+			baseSugar = ((food.sugar ?? 0) / 100) * grams;
+			baseSodium = ((food.sodium ?? 0) / 100) * grams;
 		} else if (entry.customGrams) {
 			baseCalories = (food.calories / 100) * entry.customGrams;
 			baseProtein = (food.protein / 100) * entry.customGrams;
 			baseCarbs = (food.carbs / 100) * entry.customGrams;
 			baseFat = (food.fat / 100) * entry.customGrams;
+			baseFiber = ((food.fiber ?? 0) / 100) * entry.customGrams;
+			baseSugar = ((food.sugar ?? 0) / 100) * entry.customGrams;
+			baseSodium = ((food.sodium ?? 0) / 100) * entry.customGrams;
 		} else {
 			baseCalories = food.calories;
 			baseProtein = food.protein;
 			baseCarbs = food.carbs;
 			baseFat = food.fat;
+			baseFiber = food.fiber ?? 0;
+			baseSugar = food.sugar ?? 0;
+			baseSodium = food.sodium ?? 0;
 		}
 
 		await db.update(foodEntries)
@@ -224,6 +238,9 @@ export const actions: Actions = {
 				protein: baseProtein * quantity,
 				carbs: baseCarbs * quantity,
 				fat: baseFat * quantity,
+				fiber: baseFiber * quantity,
+				sugar: baseSugar * quantity,
+				sodium: baseSodium * quantity,
 			})
 			.where(eq(foodEntries.id, entryId));
 

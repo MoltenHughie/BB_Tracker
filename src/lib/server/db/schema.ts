@@ -113,6 +113,10 @@ export const foodEntries = sqliteTable(
 		protein: real('protein').notNull(),
 		carbs: real('carbs').notNull(),
 		fat: real('fat').notNull(),
+		// Optional micros (captured at log time for historical accuracy)
+		fiber: real('fiber'), // g
+		sugar: real('sugar'), // g
+		sodium: real('sodium'), // mg
 		// Timestamps
 		loggedAt: text('logged_at').notNull(),
 		createdAt: text('created_at').notNull()
