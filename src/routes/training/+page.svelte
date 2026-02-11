@@ -708,15 +708,24 @@
 				<ul class="space-y-1">
 					{#each filteredExercises() as exercise}
 						<li>
-							<button
-								onclick={() => selectExercise(exercise)}
-								class="w-full text-left p-3 rounded-lg hover:bg-[var(--color-surface-hover)] transition-colors"
-							>
-								<div class="font-medium">{exercise.name}</div>
-								<div class="text-sm text-[var(--color-text-muted)] capitalize">
-									{exercise.category} • {exercise.equipment}
-								</div>
-							</button>
+							<div class="flex items-stretch gap-2">
+								<button
+									onclick={() => selectExercise(exercise)}
+									class="flex-1 text-left p-3 rounded-lg hover:bg-[var(--color-surface-hover)] transition-colors"
+								>
+									<div class="font-medium">{exercise.name}</div>
+									<div class="text-sm text-[var(--color-text-muted)] capitalize">
+										{exercise.category} • {exercise.equipment}
+									</div>
+								</button>
+								<a
+									href={`/training/exercise/${exercise.id}`}
+									class="px-3 rounded-lg bg-[var(--color-bg)] hover:bg-[var(--color-surface-hover)] flex items-center justify-center text-sm text-[var(--color-text-muted)]"
+									title="View history"
+								>
+									📈
+								</a>
+							</div>
 						</li>
 					{/each}
 				</ul>

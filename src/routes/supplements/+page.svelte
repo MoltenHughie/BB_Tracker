@@ -252,6 +252,35 @@
 		</div>
 	</div>
 
+	<!-- 7-Day Adherence -->
+	{#if data.adherence.total > 0}
+		<div class="card">
+			<div class="flex items-center justify-between mb-3">
+				<h2 class="text-sm font-semibold">📊 7-Day Adherence</h2>
+				<span class="text-lg font-bold {data.adherence.percent >= 80 ? 'text-green-400' : data.adherence.percent >= 50 ? 'text-yellow-400' : 'text-red-400'}">{data.adherence.percent}%</span>
+			</div>
+			<div class="flex items-end gap-1 h-16">
+				{#each data.adherence.days as day}
+					{@const pct = day.scheduled > 0 ? (day.taken / day.scheduled) * 100 : 0}
+					{@const isCurrentDate = day.date === data.date}
+					<div class="flex-1 flex flex-col items-center gap-0.5">
+						<div class="w-full flex flex-col items-center" style="height: 40px;">
+							<div class="flex-1"></div>
+							<div
+								class="w-full max-w-[24px] rounded-t transition-all duration-300 {pct === 100 ? 'bg-green-500' : pct > 0 ? 'bg-yellow-500' : day.scheduled > 0 ? 'bg-[var(--color-surface-hover)]' : ''}"
+								style="height: {day.scheduled > 0 ? Math.max(4, pct * 0.4) : 0}px"
+							></div>
+						</div>
+						<span class="text-[10px] {isCurrentDate ? 'font-bold text-[var(--color-primary)]' : 'text-[var(--color-text-muted)]'}">{day.dayLabel}</span>
+					</div>
+				{/each}
+			</div>
+			<div class="mt-2 text-xs text-[var(--color-text-muted)] text-center">
+				{data.adherence.taken}/{data.adherence.total} doses taken this week
+			</div>
+		</div>
+	{/if}
+
 	<!-- Today's Schedule -->
 	{#if data.todaySchedule.length > 0}
 		<section class="space-y-4">

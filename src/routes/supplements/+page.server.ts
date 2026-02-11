@@ -104,13 +104,57 @@ export const load: PageServerLoad = async ({ url }) => {
 	// Categories for filtering
 	const categories = [...new Set(allSupplements.map(s => s.category).filter(Boolean))].sort();
 
+	// --- 7-day adherence stats ---
+	const adherenceDays: { date: string; dayLabel: string; scheduled: number; taken: number }[] = [];
+	for (let i = 6; i >= 0; i--) {
+		const d = new Date(date);
+		d.setDate(d.getDate() - i);
+		const dayStr = d.toISOString().split('T')[0];
+		const dow = d.getDay();
+		const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+		// Count schedules active on that day
+		const scheduledCount = allSupplements.reduce((sum, supp) => {
+			return sum + supp.schedules.filter(sched => {
+				if (!sched.isActive) return false;
+				if (sched.daysOfWeek) {
+					try {
+						const days = JSON.parse(sched.daysOfWeek) as number[];
+						return days.includes(dow);
+					} catch { return true; }
+				}
+				return true;
+			}).length;
+		}, 0);
+
+		// Count logs for that day
+		const takenCount = recentLogs.filter(l => l.date === dayStr).length;
+
+		adherenceDays.push({
+			date: dayStr,
+			dayLabel: dayLabels[dow],
+			scheduled: scheduledCount,
+			taken: Math.min(takenCount, scheduledCount) // cap at scheduled
+		});
+	}
+
+	const adherenceTotal = adherenceDays.reduce((s, d) => s + d.scheduled, 0);
+	const adherenceTaken = adherenceDays.reduce((s, d) => s + d.taken, 0);
+	const adherencePercent = adherenceTotal > 0 ? Math.round((adherenceTaken / adherenceTotal) * 100) : 0;
+
 	return {
 		date,
 		todaySchedule,
 		todayLogs,
 		allSupplements,
 		recentLogs,
-		categories
+		categories,
+		adherence: {
+			days: adherenceDays,
+			total: adherenceTotal,
+			taken: adherenceTaken,
+			percent: adherencePercent
+		}
 	};
 };
 
