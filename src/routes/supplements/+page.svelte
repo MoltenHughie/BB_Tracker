@@ -202,12 +202,15 @@
 	<header class="space-y-2">
 		<div class="flex items-center justify-between">
 			<h1 class="text-2xl font-bold">💊 Supplements</h1>
-			<button 
-				onclick={() => showManualLogModal = true}
-				class="btn btn-secondary text-sm"
-			>
-				+ Quick Log
-			</button>
+			<div class="flex items-center gap-2">
+				<a href="/supplements/history" class="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]">📋</a>
+				<button 
+					onclick={() => showManualLogModal = true}
+					class="btn btn-secondary text-sm"
+				>
+					+ Quick Log
+				</button>
+			</div>
 		</div>
 		<div class="flex items-center justify-center gap-4">
 			<button onclick={() => navigateDate(-1)} class="text-xl px-2 hover:text-[var(--color-primary)]">‹</button>
