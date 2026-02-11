@@ -7,9 +7,13 @@
 	let editingId = $state<number | null>(null);
 	let showAddModal = $state(false);
 	let confirmDeleteId = $state<number | null>(null);
-	// eslint-disable-next-line -- intentional one-time capture
-	let searchInput = $state('' + data.search);
+	let searchInput = $state('');
 	let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+
+	// Keep searchInput in sync with server-loaded query params (e.g., back/forward nav).
+	$effect(() => {
+		searchInput = '' + (data.search ?? '');
+	});
 
 	function onSearch(value: string) {
 		searchInput = value;
