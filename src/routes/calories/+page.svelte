@@ -227,6 +227,20 @@
 		{/if}
 	</div>
 
+	<!-- Weekly average -->
+	{#if data.weeklyAvg}
+		<div class="card bg-[var(--color-bg)]">
+			<div class="flex items-center justify-between">
+				<div class="text-sm text-[var(--color-text-muted)]">📊 7-day avg ({data.weeklyAvg.days} days)</div>
+				<div class="text-right">
+					<span class="font-bold">{data.weeklyAvg.calories}</span>
+					<span class="text-sm text-[var(--color-text-muted)]"> kcal</span>
+					<span class="text-xs text-[var(--color-text-muted)] ml-2">{data.weeklyAvg.protein}g protein</span>
+				</div>
+			</div>
+		</div>
+	{/if}
+
 	<!-- Copy previous day -->
 	{#if data.entries.length === 0}
 		<form method="POST" action="?/copyPreviousDay" use:enhance>

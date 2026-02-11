@@ -1,6 +1,6 @@
 import { db } from '$lib/server/db';
 import { foods, foodEntries, mealTypes, dailyTargets } from '$lib/server/db/schema';
-import { eq, and, desc, asc, gte } from 'drizzle-orm';
+import { eq, and, desc, asc, gte, sql } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 
@@ -66,6 +66,31 @@ export const load: PageServerLoad = async ({ url }) => {
 		{ calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0, sodium: 0 }
 	);
 
+	// Weekly average (last 7 days including today)
+	const weekStart = new Date(date);
+	weekStart.setDate(weekStart.getDate() - 6);
+	const weekStartStr = weekStart.toISOString().split('T')[0];
+
+	const weekEntries = await db
+		.select({
+			date: foodEntries.date,
+			calories: sql<number>`SUM(${foodEntries.calories})`,
+			protein: sql<number>`SUM(${foodEntries.protein})`,
+		})
+		.from(foodEntries)
+		.where(and(
+			gte(foodEntries.date, weekStartStr),
+			sql`${foodEntries.date} <= ${date}`
+		))
+		.groupBy(foodEntries.date);
+
+	const daysWithData = weekEntries.filter(d => d.calories > 0);
+	const weeklyAvg = daysWithData.length > 0 ? {
+		calories: Math.round(daysWithData.reduce((s, d) => s + d.calories, 0) / daysWithData.length),
+		protein: Math.round(daysWithData.reduce((s, d) => s + d.protein, 0) / daysWithData.length),
+		days: daysWithData.length
+	} : null;
+
 	return {
 		date,
 		target,
@@ -73,7 +98,8 @@ export const load: PageServerLoad = async ({ url }) => {
 		entries,
 		allFoods,
 		recentFoodIds,
-		totals
+		totals,
+		weeklyAvg
 	};
 };
 
