@@ -219,7 +219,10 @@
 <div class="space-y-6 pb-4">
 	<header class="flex items-center justify-between">
 		<h1 class="text-2xl font-bold">💪 Training</h1>
-		<time class="text-[var(--color-text-muted)] text-sm">{today}</time>
+		<div class="flex items-center gap-3">
+			<a href="/training/history" class="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]">📋 History</a>
+			<time class="text-[var(--color-text-muted)] text-sm">{today}</time>
+		</div>
 	</header>
 
 	{#if data.activeWorkout}
