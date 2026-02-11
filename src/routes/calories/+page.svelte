@@ -152,12 +152,15 @@
 	<header class="space-y-2">
 		<div class="flex items-center justify-between">
 			<h1 class="text-2xl font-bold">🍎 Calories</h1>
-			<button 
-				onclick={() => showTargetModal = true}
-				class="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
-			>
-				⚙️ Targets
-			</button>
+			<div class="flex items-center gap-3">
+				<a href="/calories/history" class="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]">📊 History</a>
+				<button 
+					onclick={() => showTargetModal = true}
+					class="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
+				>
+					⚙️ Targets
+				</button>
+			</div>
 		</div>
 		<div class="flex items-center justify-center gap-4">
 			<button onclick={() => { const d = new Date(data.date); d.setDate(d.getDate() - 1); window.location.href = `/calories?date=${d.toISOString().split('T')[0]}`; }} class="text-xl px-2 hover:text-[var(--color-primary)]">‹</button>
