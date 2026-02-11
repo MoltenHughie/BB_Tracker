@@ -144,12 +144,15 @@
 	<header class="space-y-2">
 		<div class="flex items-center justify-between">
 			<h1 class="text-2xl font-bold">📏 Body</h1>
-			<button 
-				onclick={() => showHistoryModal = true}
-				class="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
-			>
-				📊 History
-			</button>
+			<div class="flex items-center gap-3">
+				<a href="/body/measurements" class="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]">📐 Trends</a>
+				<button 
+					onclick={() => showHistoryModal = true}
+					class="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
+				>
+					📊 History
+				</button>
+			</div>
 		</div>
 		<div class="flex items-center justify-center gap-4">
 			<button onclick={() => { const d = new Date(data.date); d.setDate(d.getDate() - 1); window.location.href = `/body?date=${d.toISOString().split('T')[0]}`; }} class="text-xl px-2 hover:text-[var(--color-primary)]">‹</button>
