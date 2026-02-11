@@ -20,6 +20,9 @@
 	<header class="text-center space-y-2">
 		<h1 class="text-2xl font-bold">BB Tracker</h1>
 		<p class="text-[var(--color-text-muted)]">{todayFormatted}</p>
+		{#if data.streak > 0}
+			<p class="text-sm">🔥 {data.streak} day streak</p>
+		{/if}
 	</header>
 
 	<!-- Quick stats cards -->

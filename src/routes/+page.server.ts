@@ -106,8 +106,36 @@ export const load: PageServerLoad = async () => {
 		};
 	});
 
+	// --- Logging streak (consecutive days with any food entry, ending today or yesterday) ---
+	const recentDates = await db.selectDistinct({ date: foodEntries.date })
+		.from(foodEntries)
+		.orderBy(desc(foodEntries.date));
+	
+	let streak = 0;
+	const checkDate = new Date(today);
+	for (const row of recentDates) {
+		const expected = checkDate.toISOString().split('T')[0];
+		if (row.date === expected) {
+			streak++;
+			checkDate.setDate(checkDate.getDate() - 1);
+		} else if (streak === 0) {
+			// Allow starting from yesterday
+			checkDate.setDate(checkDate.getDate() - 1);
+			const yesterdayExpected = checkDate.toISOString().split('T')[0];
+			if (row.date === yesterdayExpected) {
+				streak++;
+				checkDate.setDate(checkDate.getDate() - 1);
+			} else {
+				break;
+			}
+		} else {
+			break;
+		}
+	}
+
 	return {
 		today,
+		streak,
 		calories: {
 			eaten: Math.round(caloriesEaten),
 			target: latestTarget?.calories ?? null,
