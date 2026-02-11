@@ -1,7 +1,10 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { browser } from '$app/environment';
 
 	let { data, form } = $props();
+	
+	let currentTheme = $state(browser ? (localStorage.getItem('bb-theme') ?? 'dark') : 'dark');
 
 	// Handle export download
 	$effect(() => {
@@ -47,6 +50,29 @@
 			{alert.text}
 		</div>
 	{/if}
+
+	<!-- Theme -->
+	<section class="card">
+		<div class="flex items-center justify-between">
+			<div>
+				<h2 class="text-lg font-semibold">🎨 Theme</h2>
+				<p class="text-sm text-[var(--color-text-muted)]">Switch between dark and light mode</p>
+			</div>
+			<button
+				onclick={() => {
+					const html = document.documentElement;
+					const current = html.getAttribute('data-theme') ?? 'dark';
+					const next = current === 'dark' ? 'light' : 'dark';
+					html.setAttribute('data-theme', next);
+					localStorage.setItem('bb-theme', next);
+					currentTheme = next;
+				}}
+				class="btn btn-secondary text-sm"
+			>
+				{currentTheme === 'light' ? '🌙 Dark' : '☀️ Light'}
+			</button>
+		</div>
+	</section>
 
 	<!-- Database Stats -->
 	<section class="card">

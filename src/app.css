@@ -13,6 +13,15 @@
 	--nav-height: 4rem;
 }
 
+/* Light theme */
+:root[data-theme="light"] {
+	--color-bg: #f8fafc;
+	--color-surface: #ffffff;
+	--color-surface-hover: #e2e8f0;
+	--color-text: #0f172a;
+	--color-text-muted: #64748b;
+}
+
 html {
 	@apply scroll-smooth;
 }

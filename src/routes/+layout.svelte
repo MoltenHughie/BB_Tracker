@@ -1,8 +1,17 @@
 <script lang="ts">
 	import '../app.css';
 	import { page } from '$app/stores';
+	import { browser } from '$app/environment';
 
 	let { children } = $props();
+
+	// Theme handling — apply stored theme on mount
+	$effect(() => {
+		if (browser) {
+			const stored = localStorage.getItem('bb-theme') ?? 'dark';
+			document.documentElement.setAttribute('data-theme', stored);
+		}
+	});
 
 	const navItems = [
 		{ href: '/', label: 'Home', icon: '🏠' },
