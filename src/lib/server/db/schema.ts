@@ -150,6 +150,30 @@ export const exercises = sqliteTable('exercises', {
 	updatedAt: text('updated_at').notNull()
 });
 
+// Exercise catalog (imported, non-user authored)
+export const exerciseCatalog = sqliteTable(
+	'exercise_catalog',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		name: text('name').notNull(),
+		category: text('category'),
+		level: text('level'),
+		equipment: text('equipment'),
+		primaryMuscles: text('primary_muscles').notNull(), // JSON array
+		secondaryMuscles: text('secondary_muscles').notNull(), // JSON array
+		source: text('source').notNull().default('free-exercise-db'),
+		createdAt: text('created_at').notNull()
+	},
+	(table) => ({
+		nameEquipmentCategoryUnique: uniqueIndex('exercise_catalog_name_equipment_category_unique').on(
+			table.name,
+			table.equipment,
+			table.category
+		),
+		nameIdx: index('exercise_catalog_name_idx').on(table.name)
+	})
+);
+
 // Workout templates (splits)
 export const workoutTemplates = sqliteTable('workout_templates', {
 	id: integer('id').primaryKey({ autoIncrement: true }),
