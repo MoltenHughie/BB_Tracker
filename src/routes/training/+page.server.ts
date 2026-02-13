@@ -5,7 +5,8 @@ import {
 	templateExercises,
 	workouts,
 	workoutSets,
-	personalRecords
+	personalRecords,
+	exerciseCatalog
 } from '$lib/server/db/schema';
 import { eq, desc, asc, and, gte, isNull, isNotNull } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
@@ -62,6 +63,13 @@ export const load: PageServerLoad = async () => {
 	// Get all exercises for the exercise picker
 	const allExercises = await db.query.exercises.findMany({
 		orderBy: [asc(exercises.category), asc(exercises.name)]
+	});
+
+	// Imported exercise catalog (used to prefill creation of new custom exercises)
+	// Limit to keep payloads reasonable; we can add server-side search later if needed.
+	const exerciseCatalogEntries = await db.query.exerciseCatalog.findMany({
+		orderBy: [asc(exerciseCatalog.category), asc(exerciseCatalog.name)],
+		limit: 500
 	});
 
 	// Get previous performance data for all exercises (from most recent completed workout)
@@ -141,6 +149,7 @@ export const load: PageServerLoad = async () => {
 		thisWeekWorkouts,
 		activeWorkout,
 		allExercises,
+		exerciseCatalogEntries,
 		previousPerformance,
 		personalRecords: allPRs,
 		weeklyVolumeByCategory

@@ -111,17 +111,41 @@
 			filtered = filtered.filter(e => e.category === exerciseCategory);
 		}
 		if (exerciseSearch) {
-			filtered = filtered.filter(e => 
+			filtered = filtered.filter(e =>
 				e.name.toLowerCase().includes(exerciseSearch.toLowerCase())
 			);
 		}
 		return filtered;
 	});
+
+	// Catalog entries (imported list) are only used to prefill creation of a custom exercise.
+	const filteredCatalog = $derived((): any[] => {
+		let filtered = (data as any).exerciseCatalogEntries ?? [];
+		if (exerciseCategory) {
+			filtered = filtered.filter((e: any) => e.category === exerciseCategory);
+		}
+		if (exerciseSearch) {
+			filtered = filtered.filter((e: any) =>
+				e.name.toLowerCase().includes(exerciseSearch.toLowerCase())
+			);
+		}
+		return filtered.slice(0, 25);
+	});
 	
 	const categories = $derived(() => {
-		const cats = new Set(data.allExercises.map(e => e.category).filter(Boolean));
+		const cats = new Set([
+			...data.allExercises.map(e => e.category).filter(Boolean),
+			...(((data as any).exerciseCatalogEntries ?? []).map((e: any) => e.category).filter(Boolean))
+		]);
 		return Array.from(cats).sort();
 	});
+
+	function prefillCreateExerciseFromCatalog(entry: any) {
+		showCreateExercise = true;
+		createExName = entry.name;
+		createExCategory = entry.category ?? 'other';
+		createExEquipment = entry.equipment ?? 'other';
+	}
 	
 	// Group sets by exercise for the active workout
 	const exercisesInWorkout = $derived(() => {
@@ -737,6 +761,27 @@
 						</li>
 					{/each}
 				</ul>
+
+				{#if filteredCatalog().length > 0}
+					<div class="mt-4">
+						<div class="text-xs uppercase tracking-wide text-[var(--color-text-muted)] mb-2">Catalog (prefill)</div>
+						<ul class="space-y-1">
+							{#each filteredCatalog() as entry}
+								<li>
+									<button
+										onclick={() => prefillCreateExerciseFromCatalog(entry)}
+										class="w-full text-left p-3 rounded-lg bg-[var(--color-bg)] hover:bg-[var(--color-surface-hover)] transition-colors"
+									>
+										<div class="font-medium">{entry.name}</div>
+										<div class="text-sm text-[var(--color-text-muted)] capitalize">
+											{entry.category} • {entry.equipment}
+										</div>
+									</button>
+								</li>
+							{/each}
+						</ul>
+					</div>
+				{/if}
 
 				<!-- Create custom exercise -->
 				{#if showCreateExercise}
