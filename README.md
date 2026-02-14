@@ -85,6 +85,22 @@ src/
 - No cloud sync, no accounts — your data stays on your device
 - Full JSON export/import from the Settings page
 
+## Public datasets (integrations)
+
+### Exercises — free-exercise-db
+
+Source: <https://github.com/yuhonas/free-exercise-db/>
+
+Current approach (local-first):
+- Vendor the upstream `dist/exercises.json` into `static/datasets/free-exercise-db.exercises.json`.
+- Update it with:
+
+```bash
+node scripts/fetch-free-exercise-db.mjs
+```
+
+This keeps exercise search working offline while still allowing occasional refreshes.
+
 ## Backup & Restore
 
 ### What to back up
