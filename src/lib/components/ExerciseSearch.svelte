@@ -93,7 +93,7 @@
 				<div class="flex items-stretch gap-2">
 					<button
 						type="button"
-						onclick={() => dispatch('selectExercise', ex)}
+						onclick={() => dispatch('selectExercise', ex as Exercise)}
 						class="flex-1 text-left p-3 rounded-lg hover:bg-[var(--color-surface-hover)] transition-colors"
 					>
 						<div class="font-medium">{ex.name}</div>
@@ -104,7 +104,7 @@
 
 					{#if historyHrefForExerciseId}
 						<a
-							href={historyHrefForExerciseId(ex.id)}
+							href={historyHrefForExerciseId((ex as Exercise).id)}
 							class="px-3 rounded-lg bg-[var(--color-bg)] hover:bg-[var(--color-surface-hover)] flex items-center justify-center text-sm text-[var(--color-text-muted)]"
 							title="View history"
 						>
