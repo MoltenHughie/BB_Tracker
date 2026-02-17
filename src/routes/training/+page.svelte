@@ -210,7 +210,10 @@
 	<header class="flex items-center justify-between">
 		<h1 class="text-2xl font-bold">💪 Training</h1>
 		<div class="flex items-center gap-3">
-			<a href="/training/history" class="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]">📋 History</a>
+			<div class="flex items-center gap-3">
+				<a href="/training/history" class="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]">📋 History</a>
+				<a href="/training/trends" class="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]">📈 Trends</a>
+			</div>
 			<time class="text-[var(--color-text-muted)] text-sm">{today}</time>
 		</div>
 	</header>

@@ -104,7 +104,10 @@
 		<div class="flex items-center justify-between">
 			<h1 class="text-2xl font-bold">🍎 Calories</h1>
 			<div class="flex items-center gap-3">
-				<a href="/calories/history" class="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]">📊 History</a>
+				<div class="flex items-center gap-3">
+					<a href="/calories/history" class="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]">📊 History</a>
+					<a href="/calories/trends" class="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]">📈 Trends</a>
+				</div>
 				<button 
 					onclick={() => showTargetModal = true}
 					class="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
