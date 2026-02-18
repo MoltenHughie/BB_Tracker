@@ -3,15 +3,15 @@
 
 	let { data } = $props();
 
-	$: weightPoints = data.progressData.map((d) => ({
+	const weightPoints = $derived(data.progressData.map((d: any) => ({
 		y: d.maxWeight,
 		label: d.date.slice(5),
-	}));
+	})));
 
-	$: volumePoints = data.progressData.map((d) => ({
+	const volumePoints = $derived(data.progressData.map((d: any) => ({
 		y: d.maxVolume,
 		label: d.date.slice(5),
-	}));
+	})));
 
 	function selectExercise(e: Event) {
 		const id = (e.target as HTMLSelectElement).value;

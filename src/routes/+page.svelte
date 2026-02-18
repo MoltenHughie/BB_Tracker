@@ -1,4 +1,5 @@
 <script lang="ts">
+	import DonutChart from '$lib/components/DonutChart.svelte';
 	let { data } = $props();
 
 	const todayFormatted = new Date().toLocaleDateString('en-US', {
@@ -37,6 +38,19 @@
 			{#if data.calories.protein > 0}
 				<div class="text-xs text-[var(--color-text-muted)] mt-1">
 					{data.calories.protein}g protein{#if data.calories.proteinTarget} / {data.calories.proteinTarget}g{/if}
+				</div>
+			{/if}
+			{#if data.calories.protein > 0 || data.calories.eaten > 0}
+				<div class="mt-2">
+					<DonutChart
+						segments={[
+							{ label: 'P', value: data.calories.protein || 0, color: '#3b82f6' },
+							{ label: 'C', value: data.calories.carbs || 0, color: '#f59e0b' },
+							{ label: 'F', value: data.calories.fat || 0, color: '#f43f5e' }
+						]}
+						size={80}
+						strokeWidth={12}
+					/>
 				</div>
 			{/if}
 			{#if data.calories.avg7d}

@@ -3,25 +3,25 @@
 
 	let { data } = $props();
 
-	$: calPoints = data.dailyTotals.map((d) => ({
+	const calPoints = $derived(data.dailyTotals.map((d: any) => ({
 		y: Math.round(d.totalCalories ?? 0),
-		label: d.date?.slice(5) ?? '' // MM-DD
-	}));
+		label: d.date?.slice(5) ?? ''
+	})));
 
-	$: proteinPoints = data.dailyTotals.map((d) => ({
+	const proteinPoints = $derived(data.dailyTotals.map((d: any) => ({
 		y: Math.round(d.totalProtein ?? 0),
 		label: d.date?.slice(5) ?? ''
-	}));
+	})));
 
-	$: carbPoints = data.dailyTotals.map((d) => ({
+	const carbPoints = $derived(data.dailyTotals.map((d: any) => ({
 		y: Math.round(d.totalCarbs ?? 0),
 		label: d.date?.slice(5) ?? ''
-	}));
+	})));
 
-	$: fatPoints = data.dailyTotals.map((d) => ({
+	const fatPoints = $derived(data.dailyTotals.map((d: any) => ({
 		y: Math.round(d.totalFat ?? 0),
 		label: d.date?.slice(5) ?? ''
-	}));
+	})));
 </script>
 
 <div class="space-y-6 p-4">

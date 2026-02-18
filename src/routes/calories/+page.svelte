@@ -2,6 +2,7 @@
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import FoodSearch from '$lib/components/FoodSearch.svelte';
+	import DonutChart from '$lib/components/DonutChart.svelte';
 	
 	let { data } = $props();
 	
@@ -163,23 +164,20 @@
 			></div>
 		</div>
 
-		<!-- Macro breakdown bar -->
+		<!-- Macro donut chart -->
 		{#if data.totals.protein + data.totals.carbs + data.totals.fat > 0}
-			{@const totalMacroG = data.totals.protein + data.totals.carbs + data.totals.fat}
-			{@const pPct = (data.totals.protein / totalMacroG) * 100}
-			{@const cPct = (data.totals.carbs / totalMacroG) * 100}
-			{@const fPct = (data.totals.fat / totalMacroG) * 100}
-			<div class="mt-3">
-				<div class="flex h-2 rounded-full overflow-hidden">
-					<div class="bg-blue-500 transition-all" style="width: {pPct}%"></div>
-					<div class="bg-amber-500 transition-all" style="width: {cPct}%"></div>
-					<div class="bg-rose-500 transition-all" style="width: {fPct}%"></div>
-				</div>
-				<div class="flex justify-between text-[10px] text-[var(--color-text-muted)] mt-1">
-					<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-500 inline-block"></span>P {Math.round(data.totals.protein)}g ({Math.round(pPct)}%)</span>
-					<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-500 inline-block"></span>C {Math.round(data.totals.carbs)}g ({Math.round(cPct)}%)</span>
-					<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-rose-500 inline-block"></span>F {Math.round(data.totals.fat)}g ({Math.round(fPct)}%)</span>
-				</div>
+			<div class="mt-4">
+				<DonutChart
+					segments={[
+						{ label: `Protein ${Math.round(data.totals.protein)}g`, value: data.totals.protein, color: '#3b82f6' },
+						{ label: `Carbs ${Math.round(data.totals.carbs)}g`, value: data.totals.carbs, color: '#f59e0b' },
+						{ label: `Fat ${Math.round(data.totals.fat)}g`, value: data.totals.fat, color: '#f43f5e' }
+					]}
+					size={160}
+					strokeWidth={28}
+					centerValue={String(Math.round(data.totals.calories))}
+					centerLabel="kcal"
+				/>
 			</div>
 		{/if}
 	</div>
