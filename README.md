@@ -80,7 +80,68 @@ src/
 
 ## Data Storage
 
-- All data stored locally in `./data/bb_tracker.sqlite`
-- Photos stored on disk (`./data/uploads/`) with DB references
+- All data stored locally in `./data/bb_tracker.sqlite` (configurable via `BBT_DB_PATH`)
+- Photos stored on disk in `./data/uploads/` with DB references (the backup JSON stores *metadata*, not the image files)
 - No cloud sync, no accounts — your data stays on your device
-- Full JSON export/import from Settings page
+- Full JSON export/import from the Settings page
+
+## Public datasets (integrations)
+
+### Exercises — free-exercise-db
+
+Source: <https://github.com/yuhonas/free-exercise-db/>
+
+Current approach (local-first):
+- Vendor the upstream `dist/exercises.json` into `static/datasets/free-exercise-db.exercises.json`.
+- Update it with:
+
+```bash
+node scripts/fetch-free-exercise-db.mjs
+```
+
+This keeps exercise search working offline while still allowing occasional refreshes.
+
+## Backup & Restore
+
+### What to back up
+
+For a complete backup, keep **both**:
+
+1) **Database**: `./data/bb_tracker.sqlite`
+2) **Uploaded photos**: `./data/uploads/`
+
+### Recommended backup options
+
+**Option A (simple / file-level):**
+
+- Stop the app (or ensure it’s not actively writing)
+- Copy `./data/bb_tracker.sqlite` and `./data/uploads/` somewhere safe
+
+**Option B (in-app JSON export):**
+
+- Go to **Settings → Export** to download a `bb-tracker-export-YYYY-MM-DD.json`
+- This is a convenient way to move/restore *tracked data* between installs
+- If you use photos, also back up `./data/uploads/` (the JSON contains the DB rows, not the actual image files)
+
+### Restore
+
+**Restore from file-level backup:**
+
+- Put `bb_tracker.sqlite` back into `./data/`
+- Put the `uploads/` folder back into `./data/`
+
+**Restore from JSON export:**
+
+- Start with a fresh install (or accept that import will overwrite existing data)
+- Go to **Settings → Import** and select your exported JSON file
+- If you have photos, restore `./data/uploads/` as well
+
+### Docker note
+
+When running in Docker, mount `/app/data` as a volume so your data persists:
+
+```bash
+docker run -p 3000:3000 -v bb-data:/app/data bb-tracker
+```
+
+Back up that volume’s contents (it contains the SQLite DB and `uploads/`).

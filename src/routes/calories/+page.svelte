@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
+	import FoodSearch from '$lib/components/FoodSearch.svelte';
+	import DonutChart from '$lib/components/DonutChart.svelte';
 	
 	let { data } = $props();
 	
@@ -17,68 +19,18 @@
 	let selectedServingId = $state<number | null>(null);
 	let quantity = $state(1);
 	let customGrams = $state<number | null>(null);
-	let searchQuery = $state('');
-	
-	// OFF search state
-	let offResults = $state<any[]>([]);
-	let offSearching = $state(false);
-	let searchTab = $state<'local' | 'online'>('local');
-	let offSearchTimeout: ReturnType<typeof setTimeout> | null = null;
+	let selectedFoodCache = $state<any | null>(null);
 	
 	// Computed
-	const selectedFood = $derived(data.allFoods.find(f => f.id === selectedFoodId));
+	const selectedFood = $derived(data.allFoods.find(f => f.id === selectedFoodId) ?? selectedFoodCache);
 	const recentFoods = $derived(
 		data.recentFoodIds
 			.map(id => data.allFoods.find(f => f.id === id))
 			.filter((f): f is NonNullable<typeof f> => f != null)
 	);
-	const filteredFoods = $derived(
-		searchQuery.length > 0
-			? data.allFoods.filter(f => 
-				f.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-				f.brand?.toLowerCase().includes(searchQuery.toLowerCase())
-			)
-			: data.allFoods.slice(0, 20) // Show first 20 by default
-	);
 	
-	async function searchOFF(query: string) {
-		if (query.length < 2) { offResults = []; return; }
-		offSearching = true;
-		try {
-			const res = await fetch(`/api/food-search?q=${encodeURIComponent(query)}`);
-			const data = await res.json();
-			offResults = data.results || [];
-		} catch { offResults = []; }
-		offSearching = false;
-	}
 	
-	async function saveAndSelectOFF(product: any) {
-		// Save to local DB via POST
-		if (product.barcode) {
-			try {
-				const res = await fetch('/api/food-search', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ barcode: product.barcode })
-				});
-				const saved = await res.json();
-				if (saved.id) {
-					await invalidateAll(); // Refresh allFoods
-					selectedFoodId = saved.id;
-					searchTab = 'local';
-					return;
-				}
-			} catch {}
-		}
-	}
 	
-	function onSearchInput(query: string) {
-		searchQuery = query;
-		if (searchTab === 'online') {
-			if (offSearchTimeout) clearTimeout(offSearchTimeout);
-			offSearchTimeout = setTimeout(() => searchOFF(query), 400);
-		}
-	}
 	
 	// Calculate preview nutrition
 	const previewNutrition = $derived(() => {
@@ -88,7 +40,7 @@
 		if (customGrams) {
 			grams = customGrams;
 		} else if (selectedServingId) {
-			const serving = selectedFood.servings.find(s => s.id === selectedServingId);
+			const serving = selectedFood.servings.find((s: any) => s.id === selectedServingId);
 			grams = serving ? serving.grams * quantity : 100 * quantity;
 		} else {
 			grams = 100 * quantity;
@@ -133,7 +85,7 @@
 		selectedServingId = null;
 		quantity = 1;
 		customGrams = null;
-		searchQuery = '';
+		selectedFoodCache = null;
 	}
 	
 	function openAddFoodModal(mealId: number | null) {
@@ -153,7 +105,10 @@
 		<div class="flex items-center justify-between">
 			<h1 class="text-2xl font-bold">🍎 Calories</h1>
 			<div class="flex items-center gap-3">
-				<a href="/calories/history" class="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]">📊 History</a>
+				<div class="flex items-center gap-3">
+					<a href="/calories/history" class="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]">📊 History</a>
+					<a href="/calories/trends" class="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]">📈 Trends</a>
+				</div>
 				<button 
 					onclick={() => showTargetModal = true}
 					class="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
@@ -209,23 +164,20 @@
 			></div>
 		</div>
 
-		<!-- Macro breakdown bar -->
+		<!-- Macro donut chart -->
 		{#if data.totals.protein + data.totals.carbs + data.totals.fat > 0}
-			{@const totalMacroG = data.totals.protein + data.totals.carbs + data.totals.fat}
-			{@const pPct = (data.totals.protein / totalMacroG) * 100}
-			{@const cPct = (data.totals.carbs / totalMacroG) * 100}
-			{@const fPct = (data.totals.fat / totalMacroG) * 100}
-			<div class="mt-3">
-				<div class="flex h-2 rounded-full overflow-hidden">
-					<div class="bg-blue-500 transition-all" style="width: {pPct}%"></div>
-					<div class="bg-amber-500 transition-all" style="width: {cPct}%"></div>
-					<div class="bg-rose-500 transition-all" style="width: {fPct}%"></div>
-				</div>
-				<div class="flex justify-between text-[10px] text-[var(--color-text-muted)] mt-1">
-					<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-500 inline-block"></span>P {Math.round(data.totals.protein)}g ({Math.round(pPct)}%)</span>
-					<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-500 inline-block"></span>C {Math.round(data.totals.carbs)}g ({Math.round(cPct)}%)</span>
-					<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-rose-500 inline-block"></span>F {Math.round(data.totals.fat)}g ({Math.round(fPct)}%)</span>
-				</div>
+			<div class="mt-4">
+				<DonutChart
+					segments={[
+						{ label: `Protein ${Math.round(data.totals.protein)}g`, value: data.totals.protein, color: '#3b82f6' },
+						{ label: `Carbs ${Math.round(data.totals.carbs)}g`, value: data.totals.carbs, color: '#f59e0b' },
+						{ label: `Fat ${Math.round(data.totals.fat)}g`, value: data.totals.fat, color: '#f43f5e' }
+					]}
+					size={160}
+					strokeWidth={28}
+					centerValue={String(Math.round(data.totals.calories))}
+					centerLabel="kcal"
+				/>
 			</div>
 		{/if}
 	</div>
@@ -427,121 +379,28 @@
 			</div>
 			
 			<div class="p-4 flex-1 overflow-y-auto space-y-4">
-				<!-- Search -->
-				<input
-					type="text"
-					placeholder="Search foods..."
-					value={searchQuery}
-					oninput={(e) => onSearchInput((e.target as HTMLInputElement).value)}
-					class="input"
+				<!-- Food search / select -->
+			{#if !selectedFoodId}
+				<FoodSearch
+					allFoods={data.allFoods}
+					recentFoodIds={data.recentFoodIds}
+					on:select={async (e) => {
+						selectedFoodId = e.detail.foodId;
+						selectedFoodCache = e.detail.food ?? null;
+
+						// If selected from OpenFoodFacts, refresh allFoods so the chosen item appears in the local list too
+						if (e.detail.source === 'openfoodfacts') {
+							await invalidateAll();
+						}
+
+						const food = data.allFoods.find((f) => f.id === e.detail.foodId) ?? e.detail.food;
+						if (food?.servings?.length) {
+							const defaultServing = food.servings.find((s) => s.isDefault) ?? food.servings[0];
+							selectedServingId = defaultServing.id;
+						}
+					}}
 				/>
-				
-				{#if !selectedFoodId}
-					<!-- Tabs: Local / OpenFoodFacts -->
-					<div class="flex gap-2">
-						<button
-							onclick={() => searchTab = 'local'}
-							class="px-3 py-1 rounded-full text-sm transition-colors {searchTab === 'local' 
-								? 'bg-[var(--color-primary)] text-white' 
-								: 'bg-[var(--color-bg)] text-[var(--color-text-muted)]'}"
-						>
-							My Foods
-						</button>
-						<button
-							onclick={() => { searchTab = 'online'; if (searchQuery.length >= 2) searchOFF(searchQuery); }}
-							class="px-3 py-1 rounded-full text-sm transition-colors {searchTab === 'online' 
-								? 'bg-[var(--color-primary)] text-white' 
-								: 'bg-[var(--color-bg)] text-[var(--color-text-muted)]'}"
-						>
-							🌐 OpenFoodFacts
-						</button>
-					</div>
-					
-					{#if searchTab === 'local'}
-						<!-- Recent foods (quick pick) -->
-						{#if recentFoods.length > 0 && searchQuery.length === 0}
-							<div class="mb-3">
-								<div class="text-xs font-medium text-[var(--color-text-muted)] mb-2">⚡ Recent</div>
-								<div class="flex flex-wrap gap-2">
-									{#each recentFoods as food}
-										<button
-											onclick={() => {
-												selectedFoodId = food.id;
-												if (food.servings.length > 0) {
-													const defaultServing = food.servings.find(s => s.isDefault) ?? food.servings[0];
-													selectedServingId = defaultServing.id;
-												}
-											}}
-											class="px-3 py-1.5 rounded-full text-xs bg-[var(--color-bg)] hover:bg-[var(--color-surface-hover)] transition-colors border border-[var(--color-surface-hover)]"
-										>
-											{food.name}
-										</button>
-									{/each}
-								</div>
-							</div>
-						{/if}
-						<!-- Local food list -->
-						<ul class="space-y-2 max-h-60 overflow-y-auto">
-							{#each filteredFoods as food}
-								<li>
-									<button
-										onclick={() => {
-											selectedFoodId = food.id;
-											if (food.servings.length > 0) {
-												const defaultServing = food.servings.find(s => s.isDefault) ?? food.servings[0];
-												selectedServingId = defaultServing.id;
-											}
-										}}
-										class="w-full text-left p-3 rounded-lg bg-[var(--color-bg)] hover:bg-[var(--color-surface-hover)] transition-colors"
-									>
-										<div class="font-medium">{food.name}</div>
-										<div class="text-sm text-[var(--color-text-muted)]">
-											{food.calories} kcal / 100g • P{food.protein}g C{food.carbs}g F{food.fat}g
-										</div>
-									</button>
-								</li>
-							{/each}
-						</ul>
-						
-						{#if filteredFoods.length === 0}
-							<p class="text-center text-[var(--color-text-muted)] py-4">
-								No foods found. Try searching <button onclick={() => { searchTab = 'online'; searchOFF(searchQuery); }} class="text-[var(--color-primary)] underline">OpenFoodFacts</button> or create a new food.
-							</p>
-						{/if}
-					{:else}
-						<!-- OpenFoodFacts results -->
-						{#if offSearching}
-							<div class="text-center py-4 text-[var(--color-text-muted)]">
-								Searching OpenFoodFacts...
-							</div>
-						{:else if offResults.length > 0}
-							<ul class="space-y-2 max-h-60 overflow-y-auto">
-								{#each offResults as product}
-									<li>
-										<button
-											onclick={() => saveAndSelectOFF(product)}
-											class="w-full text-left p-3 rounded-lg bg-[var(--color-bg)] hover:bg-[var(--color-surface-hover)] transition-colors"
-										>
-											<div class="font-medium">{product.name}</div>
-											<div class="text-sm text-[var(--color-text-muted)]">
-												{#if product.brand}<span class="italic">{product.brand}</span> • {/if}
-												{product.calories} kcal / 100g • P{product.protein}g C{product.carbs}g F{product.fat}g
-											</div>
-										</button>
-									</li>
-								{/each}
-							</ul>
-						{:else if searchQuery.length >= 2}
-							<p class="text-center text-[var(--color-text-muted)] py-4">
-								No results found on OpenFoodFacts.
-							</p>
-						{:else}
-							<p class="text-center text-[var(--color-text-muted)] py-4">
-								Type at least 2 characters to search.
-							</p>
-						{/if}
-					{/if}
-				{:else if selectedFood}
+			{:else if selectedFood}
 					<!-- Selected food details -->
 					<div class="p-3 rounded-lg bg-[var(--color-bg)]">
 						<div class="flex justify-between items-start">

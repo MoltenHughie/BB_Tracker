@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { onDestroy } from 'svelte';
+	import ExerciseSearch from '$lib/components/ExerciseSearch.svelte';
 	
 	let { data } = $props();
 	
@@ -100,28 +101,12 @@
 	let restTimerActive = $state(false);
 	let restInterval: ReturnType<typeof setInterval> | null = null;
 	
-	// Filter state
-	let exerciseSearch = $state('');
-	let exerciseCategory = $state<string | null>(null);
-	
-	// Computed
-	const filteredExercises = $derived(() => {
-		let filtered = data.allExercises;
-		if (exerciseCategory) {
-			filtered = filtered.filter(e => e.category === exerciseCategory);
-		}
-		if (exerciseSearch) {
-			filtered = filtered.filter(e => 
-				e.name.toLowerCase().includes(exerciseSearch.toLowerCase())
-			);
-		}
-		return filtered;
-	});
-	
-	const categories = $derived(() => {
-		const cats = new Set(data.allExercises.map(e => e.category).filter(Boolean));
-		return Array.from(cats).sort();
-	});
+	function prefillCreateExerciseFromCatalog(entry: any) {
+		showCreateExercise = true;
+		createExName = entry.name;
+		createExCategory = entry.category ?? 'other';
+		createExEquipment = entry.equipment ?? 'other';
+	}
 	
 	// Group sets by exercise for the active workout
 	const exercisesInWorkout = $derived(() => {
@@ -225,7 +210,10 @@
 	<header class="flex items-center justify-between">
 		<h1 class="text-2xl font-bold">💪 Training</h1>
 		<div class="flex items-center gap-3">
-			<a href="/training/history" class="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]">📋 History</a>
+			<div class="flex items-center gap-3">
+				<a href="/training/history" class="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]">📋 History</a>
+				<a href="/training/trends" class="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]">📈 Trends</a>
+			</div>
 			<time class="text-[var(--color-text-muted)] text-sm">{today}</time>
 		</div>
 	</header>
@@ -682,61 +670,15 @@
 				<button onclick={() => showExerciseModal = false} class="text-2xl">×</button>
 			</div>
 			
-			<div class="p-4 space-y-3">
-				<input
-					type="text"
-					placeholder="Search exercises..."
-					bind:value={exerciseSearch}
-					class="input"
+			<div class="flex-1 overflow-y-auto p-4">
+				<ExerciseSearch
+					exercises={data.allExercises}
+					catalogEntries={((data as any).exerciseCatalogEntries ?? [])}
+					historyHrefForExerciseId={(id: number) => `/training/exercise/${id}`}
+					on:selectExercise={(e) => selectExercise(e.detail as any)}
+					on:prefillFromCatalog={(e) => prefillCreateExerciseFromCatalog(e.detail)}
+					on:createCustomRequested={() => (showCreateExercise = true)}
 				/>
-				
-				<div class="flex gap-2 flex-wrap">
-					<button
-						onclick={() => exerciseCategory = null}
-						class="px-3 py-1 rounded-full text-sm transition-colors {!exerciseCategory 
-							? 'bg-[var(--color-primary)] text-white' 
-							: 'bg-[var(--color-bg)] text-[var(--color-text-muted)]'}"
-					>
-						All
-					</button>
-					{#each categories() as cat}
-						<button
-							onclick={() => exerciseCategory = cat}
-							class="px-3 py-1 rounded-full text-sm transition-colors capitalize {exerciseCategory === cat 
-								? 'bg-[var(--color-primary)] text-white' 
-								: 'bg-[var(--color-bg)] text-[var(--color-text-muted)]'}"
-						>
-							{cat}
-						</button>
-					{/each}
-				</div>
-			</div>
-			
-			<div class="flex-1 overflow-y-auto p-4 pt-0">
-				<ul class="space-y-1">
-					{#each filteredExercises() as exercise}
-						<li>
-							<div class="flex items-stretch gap-2">
-								<button
-									onclick={() => selectExercise(exercise)}
-									class="flex-1 text-left p-3 rounded-lg hover:bg-[var(--color-surface-hover)] transition-colors"
-								>
-									<div class="font-medium">{exercise.name}</div>
-									<div class="text-sm text-[var(--color-text-muted)] capitalize">
-										{exercise.category} • {exercise.equipment}
-									</div>
-								</button>
-								<a
-									href={`/training/exercise/${exercise.id}`}
-									class="px-3 rounded-lg bg-[var(--color-bg)] hover:bg-[var(--color-surface-hover)] flex items-center justify-center text-sm text-[var(--color-text-muted)]"
-									title="View history"
-								>
-									📈
-								</a>
-							</div>
-						</li>
-					{/each}
-				</ul>
 
 				<!-- Create custom exercise -->
 				{#if showCreateExercise}
@@ -807,14 +749,6 @@
 							<button type="button" onclick={() => showCreateExercise = false} class="btn btn-secondary flex-1 text-sm">Cancel</button>
 						</div>
 					</form>
-				{:else}
-					<button
-						type="button"
-						onclick={() => showCreateExercise = true}
-						class="mt-3 w-full text-center p-2 rounded-lg border border-dashed border-[var(--color-surface-hover)] text-sm text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] transition-colors"
-					>
-						+ Create Custom Exercise
-					</button>
 				{/if}
 			</div>
 		</div>

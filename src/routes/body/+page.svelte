@@ -1,4 +1,6 @@
 <script lang="ts">
+	import Sparkline from '$lib/components/Sparkline.svelte';
+	import { normalizeToSparkPoints } from '$lib/components/sparkline';
 	import { enhance } from '$app/forms';
 	
 	let { data } = $props();
@@ -278,28 +280,22 @@
 			{@const chartWeights = [...data.weights].reverse()}
 			{@const minW = Math.min(...chartWeights.map(w => w.weight)) - 0.5}
 			{@const maxW = Math.max(...chartWeights.map(w => w.weight)) + 0.5}
-			{@const range = maxW - minW || 1}
 			{@const width = 300}
 			{@const height = 100}
-			{@const points = chartWeights.map((w, i) => ({
-				x: (i / (chartWeights.length - 1)) * width,
-				y: height - ((w.weight - minW) / range) * height
-			}))}
-			{@const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ')}
+			{@const values = chartWeights.map(w => w.weight)}
+			{@const points = normalizeToSparkPoints(values, width, height)}
 			<section class="card">
 				<h2 class="text-lg font-semibold mb-2">Weight Trend</h2>
-				<svg viewBox="0 0 {width} {height}" class="w-full h-24" preserveAspectRatio="none">
-					<!-- Grid lines -->
-					{#each [0, 0.25, 0.5, 0.75, 1] as frac}
-						<line x1="0" y1={height * frac} x2={width} y2={height * frac} stroke="var(--color-surface-hover)" stroke-width="0.5" />
-					{/each}
-					<!-- Line -->
-					<path d={pathD} fill="none" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-					<!-- Dots -->
-					{#each points as p}
-						<circle cx={p.x} cy={p.y} r="3" fill="var(--color-primary)" />
-					{/each}
-				</svg>
+				<div class="w-full h-24">
+					<Sparkline
+						className="w-full h-full"
+						{points}
+						{width}
+						{height}
+						stroke="var(--color-primary)"
+						strokeWidth={2}
+					/>
+				</div>
 				<div class="flex justify-between text-xs text-[var(--color-text-muted)] mt-1">
 					<span>{chartWeights[0]?.date ? formatDate(chartWeights[0].date) : ''}</span>
 					<span>{formatWeight(minW)} – {formatWeight(maxW)}</span>

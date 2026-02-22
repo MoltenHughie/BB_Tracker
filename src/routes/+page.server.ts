@@ -39,6 +39,8 @@ export const load: PageServerLoad = async () => {
 	});
 	const caloriesEaten = todayEntries.reduce((sum, e) => sum + (e.calories ?? 0), 0);
 	const proteinEaten = todayEntries.reduce((sum, e) => sum + (e.protein ?? 0), 0);
+	const carbsEaten = todayEntries.reduce((sum, e) => sum + (e.carbs ?? 0), 0);
+	const fatEaten = todayEntries.reduce((sum, e) => sum + (e.fat ?? 0), 0);
 
 	const target = await db.query.dailyTargets.findFirst({
 		where: eq(dailyTargets.date, today)
@@ -162,6 +164,8 @@ export const load: PageServerLoad = async () => {
 			eaten: Math.round(caloriesEaten),
 			target: latestTarget?.calories ?? null,
 			protein: Math.round(proteinEaten),
+			carbs: Math.round(carbsEaten),
+			fat: Math.round(fatEaten),
 			proteinTarget: latestTarget?.protein ?? null,
 			avg7d: calAvg7d
 		},
