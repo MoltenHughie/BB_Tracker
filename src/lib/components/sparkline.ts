@@ -1,4 +1,7 @@
-export type SparkPoint = { x: number; y: number };
+// SparkPoint is used by multiple lightweight chart components.
+// Some callers provide explicit x coordinates; others rely on implicit
+// index-based spacing and only supply y (+ optional label).
+export type SparkPoint = { x?: number; y: number; label?: string };
 
 /**
  * Generate an SVG path string for a polyline-like sparkline.
@@ -9,14 +12,18 @@ export type SparkPoint = { x: number; y: number };
  */
 export function sparklinePath(points: SparkPoint[]): string {
 	if (points.length === 0) return '';
+
+	const getX = (p: SparkPoint, i: number) => (p.x ?? i);
+
 	if (points.length === 1) {
 		const p = points[0]!;
-		return `M ${p.x} ${p.y}`;
+		return `M ${getX(p, 0)} ${p.y}`;
 	}
 	let d = '';
 	for (let i = 0; i < points.length; i++) {
 		const p = points[i]!;
-		d += i === 0 ? `M ${p.x} ${p.y}` : ` L ${p.x} ${p.y}`;
+		const x = getX(p, i);
+		d += i === 0 ? `M ${x} ${p.y}` : ` L ${x} ${p.y}`;
 	}
 	return d;
 }
