@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { browser } from '$app/environment';
+	import ExerciseCatalogImport from '$lib/components/ExerciseCatalogImport.svelte';
 
 	let { data, form } = $props();
 	
@@ -149,6 +150,15 @@
 			</div>
 			<button type="submit" class="btn btn-secondary text-sm px-3 py-2">Add</button>
 		</form>
+	</section>
+
+	<!-- Exercise catalog (admin) -->
+	<section class="card">
+		<h2 class="text-lg font-semibold mb-2">🏋️ Exercise Catalog</h2>
+		<p class="text-xs text-[var(--color-text-muted)] mb-3">
+			Imports the free-exercise-db dataset into your local catalog. Safe to rerun (duplicates are ignored).
+		</p>
+		<ExerciseCatalogImport limit={50} />
 	</section>
 
 	<!-- Data Management -->

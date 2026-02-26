@@ -1,5 +1,7 @@
 # BB Tracker
 
+[![CI](https://github.com/MoltenHughie/BB_Tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/MoltenHughie/BB_Tracker/actions/workflows/ci.yml)
+
 Local-only, mobile-first bodybuilding tracker built with SvelteKit 5 + Drizzle ORM + SQLite.
 
 ## Features
@@ -22,10 +24,13 @@ Local-only, mobile-first bodybuilding tracker built with SvelteKit 5 + Drizzle O
 
 ## Development
 
+Recommended Node version: **Node 22** (matches CI).
+
 ```bash
 npm install
 npm run dev          # Dev server (http://localhost:5173)
 npm run check        # Typecheck / Svelte diagnostics
+npm test             # Unit tests
 npm run build        # Production build
 npm run start        # Run production build
 ```
