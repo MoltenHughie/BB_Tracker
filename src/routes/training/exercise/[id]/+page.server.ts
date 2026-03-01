@@ -48,7 +48,6 @@ export const load: PageServerLoad = async ({ params }) => {
 					setNumber: s.setNumber,
 					weight: s.weight,
 					reps: s.reps,
-					rpe: s.rpe,
 					setType: s.setType
 				}))
 		}))

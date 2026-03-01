@@ -242,7 +242,9 @@ export const workoutSets = sqliteTable(
 		setType: text('set_type').default('working'), // 'warmup' | 'working' | 'dropset' | 'failure'
 		weight: real('weight'), // kg or lbs (user preference)
 		reps: integer('reps'),
-		rpe: real('rpe'), // Rate of Perceived Exertion 1-10
+		// NOTE: legacy column `rpe` intentionally deprecated; kept in the SQLite table for back-compat.
+		// Do not use it in code paths (UI/model treat it as removed).
+		// rpe: real('rpe'),
 		isCompleted: integer('is_completed', { mode: 'boolean' }).default(false),
 		notes: text('notes'),
 		completedAt: text('completed_at')
