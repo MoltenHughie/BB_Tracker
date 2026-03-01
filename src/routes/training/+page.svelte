@@ -51,7 +51,7 @@
 	// Set entry state
 	let newWeight = $state<number | null>(null);
 	let newReps = $state<number | null>(null);
-	let newRpe = $state<number | null>(null);
+	// rpe removed
 	let newSetType = $state<string>('working');
 	
 	// Rest timer
@@ -196,7 +196,7 @@
 		// Reset set entry
 		newWeight = null;
 		newReps = null;
-		newRpe = null;
+		// rpe removed
 		newSetType = 'working';
 	}
 	
@@ -288,14 +288,14 @@
 										<input type="number" name="weight" value={set.weight ?? ''} step="0.5" placeholder={weightUnit()} class="w-16 px-2 py-1 rounded bg-[var(--color-bg)] border border-[var(--color-surface-hover)] text-sm" />
 										<span>×</span>
 										<input type="number" name="reps" value={set.reps ?? ''} placeholder="reps" class="w-14 px-2 py-1 rounded bg-[var(--color-bg)] border border-[var(--color-surface-hover)] text-sm" />
-										<input type="number" name="rpe" value={set.rpe ?? ''} step="0.5" min="1" max="10" placeholder="RPE" class="w-14 px-2 py-1 rounded bg-[var(--color-bg)] border border-[var(--color-surface-hover)] text-sm" />
+										<!-- RPE removed -->
 										<button type="submit" class="text-green-400 hover:text-green-300 text-lg">✓</button>
 										<button type="button" onclick={() => editingSetId = null} class="text-[var(--color-text-muted)] hover:text-[var(--color-text)]">✕</button>
 									</form>
 								{:else}
 									<button type="button" onclick={() => editingSetId = set.id} class="flex-1 text-left hover:text-[var(--color-primary)] transition-colors" title="Tap to edit">
 										{set.weight ?? '—'} {weightUnit()} × {set.reps ?? '—'}
-										{#if set.rpe}<span class="text-[var(--color-text-muted)] ml-1">RPE {set.rpe}</span>{/if}
+										<!-- RPE removed -->
 									</button>
 								{/if}
 								<form method="POST" action="?/deleteSet" use:enhance>
@@ -362,7 +362,7 @@
 							<div class="flex flex-wrap gap-2">
 								{#each prev as set}
 									<span class="text-xs px-2 py-1 bg-[var(--color-surface)] rounded">
-										{set.weight ?? '—'}{weightUnit()} × {set.reps ?? '—'}{set.rpe ? ` @ ${set.rpe}` : ''}
+										{set.weight ?? '—'}{weightUnit()} × {set.reps ?? '—'}
 									</span>
 								{/each}
 							</div>
@@ -411,8 +411,8 @@
 					</div>
 					<input type="hidden" name="setType" value={newSetType} />
 					
-					<!-- Weight/Reps/RPE inputs -->
-					<div class="grid grid-cols-3 gap-3">
+					<!-- Weight/Reps inputs -->
+					<div class="grid grid-cols-2 gap-3">
 						<div>
 							<label for="set-weight" class="block text-xs text-[var(--color-text-muted)] mb-1">Weight ({weightUnit()})</label>
 							<input 
@@ -438,20 +438,7 @@
 								placeholder="—"
 							/>
 						</div>
-						<div>
-							<label for="set-rpe" class="block text-xs text-[var(--color-text-muted)] mb-1">RPE</label>
-							<input 
-								id="set-rpe"
-								type="number" 
-								name="rpe"
-								bind:value={newRpe}
-								step="0.5"
-								min="1"
-								max="10"
-								class="input text-center"
-								placeholder="—"
-							/>
-						</div>
+						<!-- RPE input removed -->
 					</div>
 					
 					<!-- Set number (auto-increment) -->
@@ -994,9 +981,7 @@
 										{#if set.weight != null && set.reps != null} × {/if}
 										{#if set.reps != null}{set.reps} reps{/if}
 									</span>
-									{#if set.rpe}
-										<span class="text-xs text-[var(--color-text-muted)]">RPE {set.rpe}</span>
-									{/if}
+									<!-- RPE removed -->
 									{#if set.setType && set.setType !== 'working'}
 										<span class="text-xs px-1.5 py-0.5 rounded bg-[var(--color-surface-hover)]">{set.setType}</span>
 									{/if}

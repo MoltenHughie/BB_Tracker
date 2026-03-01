@@ -77,7 +77,6 @@ export const load: PageServerLoad = async () => {
 	const previousPerformance: Record<number, Array<{
 		weight: number | null;
 		reps: number | null;
-		rpe: number | null;
 		setType: string;
 	}>> = {};
 
@@ -100,7 +99,6 @@ export const load: PageServerLoad = async () => {
 				previousPerformance[set.exerciseId].push({
 					weight: set.weight,
 					reps: set.reps,
-					rpe: set.rpe,
 					setType: set.setType || 'working'
 				});
 			}
@@ -221,7 +219,6 @@ export const actions: Actions = {
 		const setType = (data.get('setType') as string) || 'working';
 		const weight = data.get('weight') ? parseFloat(data.get('weight') as string) : null;
 		const reps = data.get('reps') ? parseInt(data.get('reps') as string) : null;
-		const rpe = data.get('rpe') ? parseFloat(data.get('rpe') as string) : null;
 
 		if (!workoutId || !exerciseId) {
 			return fail(400, { error: 'Workout and exercise are required' });
@@ -236,7 +233,6 @@ export const actions: Actions = {
 			setType,
 			weight,
 			reps,
-			rpe,
 			isCompleted: true,
 			completedAt: now
 		});
@@ -250,14 +246,13 @@ export const actions: Actions = {
 		const setId = parseInt(data.get('setId') as string);
 		const weight = data.get('weight') ? parseFloat(data.get('weight') as string) : null;
 		const reps = data.get('reps') ? parseInt(data.get('reps') as string) : null;
-		const rpe = data.get('rpe') ? parseFloat(data.get('rpe') as string) : null;
 
 		if (!setId) {
 			return fail(400, { error: 'Set ID is required' });
 		}
 
 		await db.update(workoutSets)
-			.set({ weight, reps, rpe })
+			.set({ weight, reps })
 			.where(eq(workoutSets.id, setId));
 
 		return { success: true };

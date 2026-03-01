@@ -134,9 +134,7 @@
 								{#if set.weight && set.reps} × {/if}
 								{#if set.reps}{set.reps} reps{/if}
 							</span>
-							{#if set.rpe}
-								<span class="text-xs text-[var(--color-text-muted)]">RPE {set.rpe}</span>
-							{/if}
+							<!-- RPE removed -->
 							{#if set.setType && set.setType !== 'working'}
 								<span class="text-xs px-1.5 py-0.5 bg-[var(--color-bg)] rounded capitalize">{set.setType}</span>
 							{/if}
