@@ -39,6 +39,55 @@
 		targetRepsMax: number | null;
 		sortOrder: number | null;
 	}>>([]);
+
+	// Template builder state (create template with inline exercises before saving)
+	type DraftTemplateExercise = {
+		exerciseId: number;
+		targetSets: number;
+		targetRepsMin: number;
+		targetRepsMax: number;
+	};
+	let draftTemplateExerciseId = $state<number | null>(null);
+	let draftTemplateTargetSets = $state(3);
+	let draftTemplateTargetRepsMin = $state(8);
+	let draftTemplateTargetRepsMax = $state(12);
+	let draftTemplateExercises = $state<DraftTemplateExercise[]>([]);
+
+	function addDraftExercise() {
+		if (!draftTemplateExerciseId) return;
+		const exId = draftTemplateExerciseId;
+		if (draftTemplateExercises.some((e) => e.exerciseId === exId)) return;
+		draftTemplateExercises = [
+			...draftTemplateExercises,
+			{
+				exerciseId: exId,
+				targetSets: Math.max(1, draftTemplateTargetSets),
+				targetRepsMin: Math.max(1, draftTemplateTargetRepsMin),
+				targetRepsMax: Math.max(1, draftTemplateTargetRepsMax)
+			}
+		];
+	}
+	function removeDraftExercise(exerciseId: number) {
+		draftTemplateExercises = draftTemplateExercises.filter((e) => e.exerciseId !== exerciseId);
+	}
+	function moveDraftExercise(exerciseId: number, dir: -1 | 1) {
+		const idx = draftTemplateExercises.findIndex((e) => e.exerciseId === exerciseId);
+		if (idx < 0) return;
+		const j = idx + dir;
+		if (j < 0 || j >= draftTemplateExercises.length) return;
+		const copy = [...draftTemplateExercises];
+		const tmp = copy[idx];
+		copy[idx] = copy[j];
+		copy[j] = tmp;
+		draftTemplateExercises = copy;
+	}
+	function resetDraftTemplateBuilder() {
+		draftTemplateExerciseId = null;
+		draftTemplateTargetSets = 3;
+		draftTemplateTargetRepsMin = 8;
+		draftTemplateTargetRepsMax = 12;
+		draftTemplateExercises = [];
+	}
 	let newPRs = $state<Array<{
 		exerciseId: number;
 		exerciseName: string;
@@ -884,15 +933,91 @@
 					</div>
 				{/each}
 				
-				<form 
-					method="POST" 
+				<form
+					method="POST"
 					action="?/createTemplate"
-					use:enhance
+					use:enhance={() => {
+						return async ({ result, update }) => {
+							if (result.type !== 'success') {
+								await update();
+								return;
+							}
+
+							const templateId = (result.data as any)?.templateId as number | undefined;
+							if (!templateId) {
+								await update();
+								return;
+							}
+
+							// Add exercises (in order) if any were drafted
+							for (const e of draftTemplateExercises) {
+								const fd = new FormData();
+								fd.set('templateId', String(templateId));
+								fd.set('exerciseId', String(e.exerciseId));
+								fd.set('targetSets', String(e.targetSets));
+								fd.set('targetRepsMin', String(e.targetRepsMin));
+								fd.set('targetRepsMax', String(e.targetRepsMax));
+								await fetch('?/addExerciseToTemplate', { method: 'POST', body: fd });
+							}
+
+							resetDraftTemplateBuilder();
+							await update();
+						};
+					}}
 					class="card space-y-3"
 				>
 					<h4 class="font-semibold">New Template</h4>
 					<input type="text" name="name" placeholder="Template name" required class="input" />
-					<button type="submit" class="btn btn-primary w-full">Create</button>
+
+					<div class="p-3 rounded-lg bg-[var(--color-bg)] space-y-2">
+						<div class="text-sm font-semibold">Build exercises</div>
+						<div class="grid grid-cols-2 gap-2">
+							<select class="input" bind:value={draftTemplateExerciseId}>
+								<option value={null}>Select exercise…</option>
+								{#each data.allExercises as ex (ex.id)}
+									<option value={ex.id}>{ex.name}</option>
+								{/each}
+							</select>
+							<button type="button" class="btn btn-secondary" onclick={addDraftExercise}>
+								Add
+							</button>
+						</div>
+						<div class="grid grid-cols-3 gap-2">
+							<label class="text-xs text-[var(--color-text-muted)]">
+								Sets
+								<input type="number" class="input text-sm mt-1" min="1" bind:value={draftTemplateTargetSets} />
+							</label>
+							<label class="text-xs text-[var(--color-text-muted)]">
+								Reps min
+								<input type="number" class="input text-sm mt-1" min="1" bind:value={draftTemplateTargetRepsMin} />
+							</label>
+							<label class="text-xs text-[var(--color-text-muted)]">
+								Reps max
+								<input type="number" class="input text-sm mt-1" min="1" bind:value={draftTemplateTargetRepsMax} />
+							</label>
+						</div>
+
+						{#if draftTemplateExercises.length > 0}
+							<div class="space-y-2 pt-2">
+								{#each draftTemplateExercises as e, idx (e.exerciseId)}
+									{@const ex = data.allExercises.find((x) => x.id === e.exerciseId)}
+									<div class="flex items-center gap-2 text-sm">
+										<div class="flex-1">
+											<div class="font-medium">{idx + 1}. {ex?.name ?? `Exercise #${e.exerciseId}`}</div>
+											<div class="text-xs text-[var(--color-text-muted)]">
+												{e.targetSets} × {e.targetRepsMin}-{e.targetRepsMax}
+											</div>
+										</div>
+										<button type="button" class="btn btn-secondary text-xs" onclick={() => moveDraftExercise(e.exerciseId, -1)} disabled={idx === 0}>↑</button>
+										<button type="button" class="btn btn-secondary text-xs" onclick={() => moveDraftExercise(e.exerciseId, 1)} disabled={idx === draftTemplateExercises.length - 1}>↓</button>
+										<button type="button" class="text-red-400 hover:text-red-300 text-sm" onclick={() => removeDraftExercise(e.exerciseId)}>×</button>
+									</div>
+								{/each}
+							</div>
+						{/if}
+					</div>
+
+					<button type="submit" class="btn btn-primary w-full">Create template</button>
 				</form>
 			</div>
 		</div>
