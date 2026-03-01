@@ -394,7 +394,7 @@
 
 		<!-- Add Set Section -->
 		<div class="card">
-			<h3 class="font-semibold mb-3">Log Set</h3>
+			<h3 class="font-semibold mb-3">Complete Set</h3>
 			
 			{#if currentExercise}
 				<div class="mb-4">
@@ -433,15 +433,19 @@
 			{/if}
 			
 			{#if currentExercise}
-				<form 
-					method="POST" 
+				<form
+					method="POST"
 					action="?/addSet"
 					use:enhance={() => {
 						return async ({ update }) => {
 							await update();
-							// Start rest timer after logging set
+							// Start rest timer after completing a set
 							const restTime = getRestTime(currentExercise, newSetType);
 							startRestTimer(restTime);
+							// Reset fields for fast next-entry
+							newWeight = null;
+							newReps = null;
+							newSetType = 'working';
 						};
 					}}
 					class="space-y-4"
@@ -503,7 +507,8 @@
 					/>
 					
 					<button type="submit" class="btn btn-primary w-full">
-						Log Set #{(data.activeWorkout?.sets.filter((s) => s.exerciseId === currentExercise?.id && s.isCompleted).length ?? 0) + 1}
+						<span class="text-lg">✓</span>
+						Complete Set #{(data.activeWorkout?.sets.filter((s) => s.exerciseId === currentExercise?.id && s.isCompleted).length ?? 0) + 1}
 					</button>
 				</form>
 			{/if}
