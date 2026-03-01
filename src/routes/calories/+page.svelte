@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
+	import { caloriesService } from '$lib/services/caloriesService';
 	import FoodSearch from '$lib/components/FoodSearch.svelte';
 	import DonutChart from '$lib/components/DonutChart.svelte';
+	import { pushToast } from '$lib/stores/toast';
 	
 	let { data } = $props();
 	
@@ -97,6 +99,41 @@
 	function closeAddFoodModal() {
 		showAddFoodModal = false;
 		resetAddForm();
+	}
+
+	async function refreshPage() {
+		// simple refresh strategy until stores are introduced
+		await invalidateAll();
+	}
+
+	let isSaving = $state(false);
+
+	async function onDeleteEntry(entryId: number) {
+		try {
+			isSaving = true;
+			await caloriesService.deleteEntry(entryId);
+			pushToast({ kind: 'success', message: 'Entry deleted' });
+			editingEntryId = null;
+			await refreshPage();
+		} catch (e: any) {
+			pushToast({ kind: 'error', message: 'Failed to delete entry', details: String(e?.message ?? e) });
+		} finally {
+			isSaving = false;
+		}
+	}
+
+	async function onUpdateEntry(entryId: number, qty: number) {
+		try {
+			isSaving = true;
+			await caloriesService.updateEntry(entryId, { quantity: qty });
+			pushToast({ kind: 'success', message: 'Entry updated' });
+			editingEntryId = null;
+			await refreshPage();
+		} catch (e: any) {
+			pushToast({ kind: 'error', message: 'Failed to update entry', details: String(e?.message ?? e) });
+		} finally {
+			isSaving = false;
+		}
 	}
 </script>
 
@@ -254,49 +291,31 @@
 											P{Math.round(entry.protein)}g
 										</div>
 									</div>
-									<form method="POST" action="?/deleteEntry" use:enhance={() => {
-										return async ({ update }) => {
-											await update();
-										};
-									}}>
-										<input type="hidden" name="entryId" value={entry.id} />
-										<button 
-											type="submit"
-											class="text-red-400 hover:text-red-300 p-1"
-											title="Delete"
-										>
-											×
-										</button>
-									</form>
+									<button
+										disabled={isSaving}
+										onclick={() => onDeleteEntry(entry.id)}
+										class="text-red-400 hover:text-red-300 p-1"
+										title="Delete"
+									>
+										×
+									</button>
 								</div>
 							</li>
 							{#if editingEntryId === entry.id}
 								<li class="py-2 px-2 bg-[var(--color-bg)] rounded-lg">
-									<form 
-										method="POST" 
-										action="?/updateEntry"
-										use:enhance={() => {
-											return async ({ update }) => {
-												await update();
-												editingEntryId = null;
-											};
-										}}
-										class="flex items-center gap-3"
-									>
-										<input type="hidden" name="entryId" value={entry.id} />
+									<div class="flex items-center gap-3">
 										<label for="edit-qty-{entry.id}" class="text-sm text-[var(--color-text-muted)]">Qty:</label>
 										<input 
 											id="edit-qty-{entry.id}"
 											type="number" 
-											name="quantity" 
 											bind:value={editServings}
 											step="0.25" 
 											min="0.25"
 											class="input w-20 text-center"
 										/>
-										<button type="submit" class="btn btn-primary text-sm px-3">Save</button>
+										<button type="button" class="btn btn-primary text-sm px-3" disabled={isSaving} onclick={() => onUpdateEntry(entry.id, editServings)}>Save</button>
 										<button type="button" onclick={() => editingEntryId = null} class="text-sm text-[var(--color-text-muted)]">Cancel</button>
-									</form>
+									</div>
 								</li>
 							{/if}
 						{/each}

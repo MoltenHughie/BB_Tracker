@@ -2,6 +2,7 @@
 	import '../app.css';
 	import { page } from '$app/stores';
 	import { browser } from '$app/environment';
+	import ToastHost from '$lib/components/ToastHost.svelte';
 
 	let { children } = $props();
 
@@ -32,6 +33,8 @@
 	<link rel="manifest" href="/manifest.json" />
 	<title>BB Tracker</title>
 </svelte:head>
+
+<ToastHost />
 
 <div class="min-h-screen flex flex-col">
 	<!-- Main content area -->
