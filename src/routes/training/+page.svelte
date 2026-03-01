@@ -59,10 +59,12 @@
 
 	// Workout summary stats (for finish modal)
 	const workoutTotalVolume = $derived(
-		data.activeWorkout?.sets.reduce((s, set) => s + (set.weight ?? 0) * (set.reps ?? 0), 0) ?? 0
+		data.activeWorkout?.sets
+			.filter((s) => s.isCompleted)
+			.reduce((sum, set) => sum + (set.weight ?? 0) * (set.reps ?? 0), 0) ?? 0
 	);
 	const workoutUniqueExercises = $derived(
-		data.activeWorkout ? new Set(data.activeWorkout.sets.map(s => s.exerciseId)).size : 0
+		data.activeWorkout ? new Set(data.activeWorkout.sets.filter((s) => s.isCompleted).map((s) => s.exerciseId)).size : 0
 	);
 	const workoutElapsedMin = $derived(
 		data.activeWorkout?.startedAt
@@ -108,16 +110,19 @@
 		createExEquipment = entry.equipment ?? 'other';
 	}
 	
-	// Group sets by exercise for the active workout
+	// Group COMPLETED sets by exercise for the active workout
 	const exercisesInWorkout = $derived(() => {
 		if (!data.activeWorkout) return [];
-		
-		const grouped = new Map<number, {
-			exercise: typeof data.allExercises[0],
-			sets: typeof data.activeWorkout.sets
-		}>();
-		
-		for (const set of data.activeWorkout.sets) {
+
+		const grouped = new Map<
+			number,
+			{
+				exercise: typeof data.allExercises[0];
+				sets: typeof data.activeWorkout.sets;
+			}
+		>();
+
+		for (const set of data.activeWorkout.sets.filter((s) => s.isCompleted)) {
 			if (!grouped.has(set.exerciseId)) {
 				grouped.set(set.exerciseId, {
 					exercise: set.exercise,
@@ -126,7 +131,7 @@
 			}
 			grouped.get(set.exerciseId)!.sets.push(set);
 		}
-		
+
 		return Array.from(grouped.values());
 	});
 	
@@ -441,11 +446,15 @@
 						<!-- RPE input removed -->
 					</div>
 					
-					<!-- Set number (auto-increment) -->
-					<input type="hidden" name="setNumber" value={(data.activeWorkout?.sets.filter(s => s.exerciseId === currentExercise?.id).length ?? 0) + 1} />
+					<!-- Set number (auto-increment; completed sets only) -->
+					<input
+						type="hidden"
+						name="setNumber"
+						value={(data.activeWorkout?.sets.filter((s) => s.exerciseId === currentExercise?.id && s.isCompleted).length ?? 0) + 1}
+					/>
 					
 					<button type="submit" class="btn btn-primary w-full">
-						Log Set #{(data.activeWorkout?.sets.filter(s => s.exerciseId === currentExercise?.id).length ?? 0) + 1}
+						Log Set #{(data.activeWorkout?.sets.filter((s) => s.exerciseId === currentExercise?.id && s.isCompleted).length ?? 0) + 1}
 					</button>
 				</form>
 			{/if}

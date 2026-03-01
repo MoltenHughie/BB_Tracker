@@ -194,17 +194,46 @@ export const actions: Actions = {
 			}
 		}
 
-		const result = await db.insert(workouts).values({
-			templateId,
-			name: workoutName || 'Workout',
-			date: today,
-			startedAt: now,
-			finishedAt: null,
-			createdAt: now
-		}).returning({ id: workouts.id });
+		const result = await db
+			.insert(workouts)
+			.values({
+				templateId,
+				name: workoutName || 'Workout',
+				date: today,
+				startedAt: now,
+				finishedAt: null,
+				createdAt: now
+			})
+			.returning({ id: workouts.id });
 
-		return { 
-			success: true, 
+		// Seed preset sets if we started from a template.
+		// We create placeholder sets (isCompleted=false) so the live workout can be filled in quickly.
+		if (templateExercisesList && templateExercisesList.length > 0) {
+			const workoutId = result[0].id;
+			const seedRows: Array<typeof workoutSets.$inferInsert> = [];
+			for (const te of templateExercisesList) {
+				const targetSets = te.targetSets ?? 3;
+				for (let i = 1; i <= targetSets; i++) {
+					seedRows.push({
+						workoutId,
+						exerciseId: te.id,
+						setNumber: i,
+						setType: 'working',
+						weight: null,
+						reps: null,
+						isCompleted: false,
+						notes: null,
+						completedAt: null
+					});
+				}
+			}
+			if (seedRows.length > 0) {
+				await db.insert(workoutSets).values(seedRows);
+			}
+		}
+
+		return {
+			success: true,
 			workoutId: result[0].id,
 			templateExercises: templateExercisesList
 		};
@@ -226,16 +255,40 @@ export const actions: Actions = {
 
 		const now = new Date().toISOString();
 
-		await db.insert(workoutSets).values({
-			workoutId,
-			exerciseId,
-			setNumber,
-			setType,
-			weight,
-			reps,
-			isCompleted: true,
-			completedAt: now
+		// If the workout was started from a template, there may be preset placeholder sets.
+		// Prefer to fill the first incomplete preset set; otherwise fall back to inserting a new completed set.
+		const preset = await db.query.workoutSets.findFirst({
+			where: and(
+				eq(workoutSets.workoutId, workoutId),
+				eq(workoutSets.exerciseId, exerciseId),
+				eq(workoutSets.isCompleted, false)
+			),
+			orderBy: asc(workoutSets.setNumber)
 		});
+
+		if (preset) {
+			await db
+				.update(workoutSets)
+				.set({
+					setType,
+					weight,
+					reps,
+					isCompleted: true,
+					completedAt: now
+				})
+				.where(eq(workoutSets.id, preset.id));
+		} else {
+			await db.insert(workoutSets).values({
+				workoutId,
+				exerciseId,
+				setNumber,
+				setType,
+				weight,
+				reps,
+				isCompleted: true,
+				completedAt: now
+			});
+		}
 
 		return { success: true };
 	},
