@@ -327,7 +327,14 @@
 		<section class="space-y-4">
 			{#each exercisesInWorkout() as { exercise, sets }}
 				<div class="card">
-					<h3 class="font-semibold mb-3">{exercise.name}</h3>
+					<div class="flex items-center justify-between mb-3">
+						<h3 class="font-semibold">{exercise.name}</h3>
+						<form method="POST" action="?/removeExerciseFromWorkout" use:enhance>
+							<input type="hidden" name="workoutId" value={data.activeWorkout.id} />
+							<input type="hidden" name="exerciseId" value={exercise.id} />
+							<button type="submit" class="text-red-400 hover:text-red-300 text-sm">Remove</button>
+						</form>
+					</div>
 					<div class="space-y-2">
 						{#each sets as set, i}
 							{@const isEditing = editingSetId === set.id}
@@ -355,6 +362,14 @@
 								<form method="POST" action="?/deleteSet" use:enhance>
 									<input type="hidden" name="setId" value={set.id} />
 									<button type="submit" class="text-red-400 hover:text-red-300">×</button>
+								</form>
+
+								<!-- Quick add a new placeholder set for this exercise -->
+								<form method="POST" action="?/addPlaceholderSet" use:enhance>
+									<input type="hidden" name="workoutId" value={data.activeWorkout.id} />
+									<input type="hidden" name="exerciseId" value={exercise.id} />
+									<input type="hidden" name="setType" value="working" />
+									<button type="submit" class="text-[var(--color-primary)] hover:opacity-80 text-sm">+ set</button>
 								</form>
 							</div>
 						{/each}
@@ -719,6 +734,21 @@
 				<h3 class="text-lg font-semibold">Select Exercise</h3>
 				<button onclick={() => showExerciseModal = false} class="text-2xl">×</button>
 			</div>
+
+			{#if data.activeWorkout}
+				<div class="px-4 pt-3">
+					<form method="POST" action="?/addExerciseToWorkout" use:enhance={() => { return async ({ update }) => { await update(); showExerciseModal = false; }; }} class="p-3 rounded-lg bg-[var(--color-bg)] flex items-center gap-2">
+						<input type="hidden" name="workoutId" value={data.activeWorkout.id} />
+						<select class="input text-sm flex-1" name="exerciseId">
+							{#each data.allExercises as ex (ex.id)}
+								<option value={ex.id}>{ex.name}</option>
+							{/each}
+						</select>
+						<input type="hidden" name="presetSets" value="3" />
+						<button type="submit" class="btn btn-primary text-sm">Add to workout</button>
+					</form>
+				</div>
+			{/if}
 			
 			<div class="flex-1 overflow-y-auto p-4">
 				<ExerciseSearch

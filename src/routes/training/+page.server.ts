@@ -324,6 +324,91 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
+	// Add a placeholder set (for template-started workouts / flexible editing)
+	addPlaceholderSet: async ({ request }) => {
+		const data = await request.formData();
+		const workoutId = parseInt(data.get('workoutId') as string);
+		const exerciseId = parseInt(data.get('exerciseId') as string);
+		const setType = (data.get('setType') as string) || 'working';
+
+		if (!workoutId || !exerciseId) {
+			return fail(400, { error: 'Workout and exercise are required' });
+		}
+
+		const existing = await db.query.workoutSets.findMany({
+			where: and(eq(workoutSets.workoutId, workoutId), eq(workoutSets.exerciseId, exerciseId))
+		});
+		const maxSetNumber = existing.reduce((m, s) => Math.max(m, s.setNumber || 0), 0);
+
+		await db.insert(workoutSets).values({
+			workoutId,
+			exerciseId,
+			setNumber: maxSetNumber + 1,
+			setType,
+			weight: null,
+			reps: null,
+			isCompleted: false,
+			notes: null,
+			completedAt: null
+		});
+
+		return { success: true };
+	},
+
+	// Add an exercise to the ACTIVE workout (creates placeholder sets)
+	addExerciseToWorkout: async ({ request }) => {
+		const data = await request.formData();
+		const workoutId = parseInt(data.get('workoutId') as string);
+		const exerciseId = parseInt(data.get('exerciseId') as string);
+		const presetSets = data.get('presetSets') ? parseInt(data.get('presetSets') as string) : 3;
+
+		if (!workoutId || !exerciseId) {
+			return fail(400, { error: 'Workout and exercise are required' });
+		}
+
+		const existing = await db.query.workoutSets.findFirst({
+			where: and(eq(workoutSets.workoutId, workoutId), eq(workoutSets.exerciseId, exerciseId))
+		});
+		if (existing) {
+			return { success: true };
+		}
+
+		const n = Number.isFinite(presetSets) ? Math.max(1, presetSets) : 3;
+		const rows: Array<any> = [];
+		for (let i = 1; i <= n; i++) {
+			rows.push({
+				workoutId,
+				exerciseId,
+				setNumber: i,
+				setType: 'working',
+				weight: null,
+				reps: null,
+				isCompleted: false,
+				notes: null,
+				completedAt: null
+			});
+		}
+		await db.insert(workoutSets).values(rows);
+
+		return { success: true };
+	},
+
+	// Remove an exercise from the ACTIVE workout (deletes all sets for that exercise)
+	removeExerciseFromWorkout: async ({ request }) => {
+		const data = await request.formData();
+		const workoutId = parseInt(data.get('workoutId') as string);
+		const exerciseId = parseInt(data.get('exerciseId') as string);
+
+		if (!workoutId || !exerciseId) {
+			return fail(400, { error: 'Workout and exercise are required' });
+		}
+
+		await db
+			.delete(workoutSets)
+			.where(and(eq(workoutSets.workoutId, workoutId), eq(workoutSets.exerciseId, exerciseId)));
+		return { success: true };
+	},
+
 	// Finish the workout
 	finishWorkout: async ({ request }) => {
 		const data = await request.formData();
