@@ -66,7 +66,7 @@
 		grouped.set(null, []); // Ungrouped
 		
 		for (const entry of data.entries) {
-			const mealId = entry.mealTypeId;
+			const mealId = entry.dayMealId;
 			const arr = grouped.get(mealId) ?? [];
 			arr.push(entry);
 			grouped.set(mealId, arr);
@@ -244,26 +244,27 @@
 	{/if}
 
 	<!-- Meals list -->
+	<form method="POST" action="?/addMeal" use:enhance={() => { return async ({ update }) => { await update(); await refreshPage(); }; }} class="card p-3 flex items-center gap-2">
+		<input type="hidden" name="date" value={data.date} />
+		<input type="text" name="name" class="input text-sm flex-1" placeholder="Add meal…" required />
+		<button type="submit" class="btn btn-primary text-sm">Add Meal</button>
+	</form>
+
 	<section class="space-y-4">
 		{#each data.meals as meal}
 			{@const mealEntries = entriesByMeal().get(meal.id) ?? []}
 			{@const mealCalories = mealEntries.reduce((sum, e) => sum + (e.calories || 0), 0)}
 			
 			<div class="card">
-				<div class="flex items-center justify-between mb-3">
-					<h2 class="text-lg font-semibold flex items-center gap-2">
-						<span>{meal.icon}</span>
-						<span>{meal.name}</span>
+				<div class="flex items-center justify-between mb-3 gap-3">
+					<form method="POST" action="?/renameMeal" use:enhance={() => { return async ({ update }) => { await update(); await refreshPage(); }; }} class="flex items-center gap-2 flex-1 min-w-0">
+						<input type="hidden" name="id" value={meal.id} />
+						<input name="name" class="input text-sm font-semibold flex-1 min-w-0" value={meal.name} />
 						{#if mealCalories > 0}
-							<span class="text-sm text-[var(--color-text-muted)] font-normal">
-								{Math.round(mealCalories)} kcal
-							</span>
+							<span class="text-sm text-[var(--color-text-muted)] whitespace-nowrap">{Math.round(mealCalories)} kcal</span>
 						{/if}
-					</h2>
-					<button 
-						onclick={() => openAddFoodModal(meal.id)}
-						class="btn btn-secondary text-sm px-3 py-1"
-					>
+					</form>
+					<button onclick={() => openAddFoodModal(meal.id)} class="btn btn-secondary text-sm px-3 py-1">
 						+ Add
 					</button>
 				</div>
@@ -517,7 +518,7 @@
 					>
 						<input type="hidden" name="date" value={data.date} />
 						<input type="hidden" name="foodId" value={selectedFoodId} />
-						<input type="hidden" name="mealTypeId" value={selectedMealId ?? ''} />
+						<input type="hidden" name="dayMealId" value={selectedMealId ?? ''} />
 						<input type="hidden" name="servingId" value={selectedServingId ?? ''} />
 						<input type="hidden" name="quantity" value={quantity} />
 						{#if customGrams}
