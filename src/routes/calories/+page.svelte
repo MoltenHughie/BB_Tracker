@@ -14,6 +14,24 @@
 	let showTargetModal = $state(false);
 	let editingEntryId = $state<number | null>(null);
 	let editServings = $state(1);
+
+	// Target mode states
+	type TargetMode = 'fixed' | 'ratios';
+	let targetMode = $state<TargetMode>('fixed');
+	let targetCalories = $state<number>(2500);
+	let targetProteinG = $state<number>(180);
+	let targetCarbsG = $state<number>(280);
+	let targetFatG = $state<number>(80);
+	let ratioProteinPct = $state<number>(30);
+	let ratioCarbsPct = $state<number>(40);
+	let ratioFatPct = $state<number>(30);
+
+	const kcalFromMacros = $derived(Math.round(targetProteinG * 4 + targetCarbsG * 4 + targetFatG * 9));
+	const ratioSum = $derived(ratioProteinPct + ratioCarbsPct + ratioFatPct);
+	const safeRatioSum = $derived(ratioSum > 0 ? ratioSum : 100);
+	const derivedProteinG = $derived(Math.round((targetCalories * (ratioProteinPct / safeRatioSum)) / 4));
+	const derivedCarbsG = $derived(Math.round((targetCalories * (ratioCarbsPct / safeRatioSum)) / 4));
+	const derivedFatG = $derived(Math.round((targetCalories * (ratioFatPct / safeRatioSum)) / 9));
 	
 	// Form states
 	let selectedMealId = $state<number | null>(null);
@@ -146,8 +164,14 @@
 					<a href="/calories/history" class="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]">📊 History</a>
 					<a href="/calories/trends" class="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]">📈 Trends</a>
 				</div>
-				<button 
-					onclick={() => showTargetModal = true}
+				<button
+					onclick={() => {
+						targetCalories = data.target?.calories ?? 2500;
+						targetProteinG = data.target?.protein ?? 180;
+						targetCarbsG = data.target?.carbs ?? 280;
+						targetFatG = data.target?.fat ?? 80;
+						showTargetModal = true;
+					}}
 					class="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
 				>
 					⚙️ Targets
@@ -604,8 +628,8 @@
 				<button onclick={() => showTargetModal = false} class="text-2xl">×</button>
 			</div>
 			
-			<form 
-				method="POST" 
+			<form
+				method="POST"
 				action="?/updateTarget"
 				use:enhance={() => {
 					return async ({ update }) => {
@@ -616,59 +640,96 @@
 				class="p-4 space-y-4"
 			>
 				<input type="hidden" name="date" value={data.date} />
-				
-				<div>
-					<label for="target_calories" class="block text-sm mb-2">Calories</label>
-					<input 
-						id="target_calories"
-						type="number" 
-						name="calories" 
-						value={data.target?.calories ?? 2500} 
-						min="1000" 
-						max="10000"
-						class="input" 
-					/>
+
+				<!-- Mode selector -->
+				<div class="card p-3 bg-[var(--color-bg)]">
+					<div class="text-sm font-semibold mb-2">Target mode</div>
+					<div class="grid grid-cols-2 gap-2">
+						<button
+							type="button"
+							onclick={() => (targetMode = 'fixed')}
+							class="btn {targetMode === 'fixed' ? 'btn-primary' : 'btn-secondary'}"
+						>
+							Fixed macros → calories derived
+						</button>
+						<button
+							type="button"
+							onclick={() => (targetMode = 'ratios')}
+							class="btn {targetMode === 'ratios' ? 'btn-primary' : 'btn-secondary'}"
+						>
+							Macro ratios → grams derived
+						</button>
+					</div>
+					<p class="text-xs text-[var(--color-text-muted)] mt-2">
+						Uses 4/4/9 kcal per gram (protein/carbs/fat). Values are rounded to whole grams.
+					</p>
 				</div>
-				
-				<div class="grid grid-cols-3 gap-4">
+
+				{#if targetMode === 'fixed'}
+					<!-- Fixed grams → derived calories -->
+					<input type="hidden" name="calories" value={kcalFromMacros} />
+					<input type="hidden" name="protein" value={targetProteinG} />
+					<input type="hidden" name="carbs" value={targetCarbsG} />
+					<input type="hidden" name="fat" value={targetFatG} />
+
 					<div>
-						<label for="target_protein" class="block text-sm mb-2">Protein (g)</label>
-						<input 
-							id="target_protein"
-							type="number" 
-							name="protein" 
-							value={data.target?.protein ?? 180} 
-							min="0"
-							class="input" 
-						/>
+						<div class="text-sm mb-2">Calories (derived)</div>
+						<div class="input bg-[var(--color-bg)] text-[var(--color-text-muted)]">{kcalFromMacros} kcal</div>
 					</div>
+
+					<div class="grid grid-cols-3 gap-4">
+						<div>
+							<label for="target_fixed_protein" class="block text-sm mb-2">Protein (g)</label>
+							<input id="target_fixed_protein" type="number" min="0" class="input" bind:value={targetProteinG} />
+						</div>
+						<div>
+							<label for="target_fixed_carbs" class="block text-sm mb-2">Carbs (g)</label>
+							<input id="target_fixed_carbs" type="number" min="0" class="input" bind:value={targetCarbsG} />
+						</div>
+						<div>
+							<label for="target_fixed_fat" class="block text-sm mb-2">Fat (g)</label>
+							<input id="target_fixed_fat" type="number" min="0" class="input" bind:value={targetFatG} />
+						</div>
+					</div>
+				{:else}
+					<!-- Calories + ratios → derived grams -->
+					<input type="hidden" name="calories" value={targetCalories} />
+					<input type="hidden" name="protein" value={derivedProteinG} />
+					<input type="hidden" name="carbs" value={derivedCarbsG} />
+					<input type="hidden" name="fat" value={derivedFatG} />
+
 					<div>
-						<label for="target_carbs" class="block text-sm mb-2">Carbs (g)</label>
-						<input 
-							id="target_carbs"
-							type="number" 
-							name="carbs" 
-							value={data.target?.carbs ?? 280} 
-							min="0"
-							class="input" 
-						/>
+						<label for="target_ratio_calories" class="block text-sm mb-2">Calories</label>
+						<input id="target_ratio_calories" type="number" min="1000" max="10000" class="input" bind:value={targetCalories} />
 					</div>
-					<div>
-						<label for="target_fat" class="block text-sm mb-2">Fat (g)</label>
-						<input 
-							id="target_fat"
-							type="number" 
-							name="fat" 
-							value={data.target?.fat ?? 80} 
-							min="0"
-							class="input" 
-						/>
+
+					<div class="grid grid-cols-3 gap-4">
+						<div>
+							<label for="target_ratio_protein" class="block text-sm mb-2">Protein (%)</label>
+							<input id="target_ratio_protein" type="number" min="0" class="input" bind:value={ratioProteinPct} />
+						</div>
+						<div>
+							<label for="target_ratio_carbs" class="block text-sm mb-2">Carbs (%)</label>
+							<input id="target_ratio_carbs" type="number" min="0" class="input" bind:value={ratioCarbsPct} />
+						</div>
+						<div>
+							<label for="target_ratio_fat" class="block text-sm mb-2">Fat (%)</label>
+							<input id="target_ratio_fat" type="number" min="0" class="input" bind:value={ratioFatPct} />
+						</div>
 					</div>
-				</div>
-				
-				<button type="submit" class="btn btn-primary w-full">
-					Save Targets
-				</button>
+
+					<div class="card p-3 bg-[var(--color-bg)] text-sm">
+						<div class="font-semibold mb-1">Derived macros</div>
+						<div class="text-[var(--color-text-muted)]">
+							Protein: {derivedProteinG}g • Carbs: {derivedCarbsG}g • Fat: {derivedFatG}g
+						</div>
+						<div class="text-xs text-[var(--color-text-muted)] mt-1">
+							Note: ratios are normalized if they don’t sum to 100 (current sum: {ratioSum}).
+						</div>
+					</div>
+				{/if}
+
+				<button type="submit" class="btn btn-primary w-full">Save Targets</button>
 			</form>
 		</div>
 	</div>
