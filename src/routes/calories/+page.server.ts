@@ -1,5 +1,5 @@
 import { db } from '$lib/server/db';
-import { foods, foodEntries, mealTypes, dailyTargets } from '$lib/server/db/schema';
+import { foods, foodEntries, mealTypes, dayMeals, dailyTargets } from '$lib/server/db/schema';
 import { eq, and, desc, asc, gte, sql } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
@@ -17,10 +17,29 @@ export const load: PageServerLoad = async ({ url }) => {
 		orderBy: desc(dailyTargets.date)
 	});
 
-	// Get all meal types
-	const meals = await db.query.mealTypes.findMany({
-		orderBy: asc(mealTypes.sortOrder)
+	// Get per-day meal sections (new dynamic meals)
+	let meals = await db.query.dayMeals.findMany({
+		where: eq(dayMeals.date, date),
+		orderBy: asc(dayMeals.sortOrder)
 	});
+
+	// Back-compat: if no day meals exist yet, create defaults based on legacy meal_types.
+	if (meals.length === 0) {
+		const legacyMeals = await db.query.mealTypes.findMany({ orderBy: asc(mealTypes.sortOrder) });
+		if (legacyMeals.length > 0) {
+			await db.insert(dayMeals).values(
+				legacyMeals.map((m) => ({
+					date,
+					name: m.name,
+					sortOrder: m.sortOrder ?? 0
+				}))
+			);
+			meals = await db.query.dayMeals.findMany({
+				where: eq(dayMeals.date, date),
+				orderBy: asc(dayMeals.sortOrder)
+			});
+		}
+	}
 
 	// Get food entries for this date with relations
 	const entries = await db.query.foodEntries.findMany({
@@ -30,7 +49,7 @@ export const load: PageServerLoad = async ({ url }) => {
 			serving: true,
 			mealType: true
 		},
-		orderBy: [asc(foodEntries.mealTypeId), desc(foodEntries.loggedAt)]
+		orderBy: [asc(foodEntries.dayMealId), asc(foodEntries.mealTypeId), desc(foodEntries.loggedAt)]
 	});
 
 	// Get all foods for the food picker
@@ -111,6 +130,7 @@ export const actions: Actions = {
 		const date = data.get('date') as string;
 		const foodId = parseInt(data.get('foodId') as string);
 		const mealTypeId = data.get('mealTypeId') ? parseInt(data.get('mealTypeId') as string) : null;
+		let dayMealId = data.get('dayMealId') ? parseInt(data.get('dayMealId') as string) : null;
 		const servingId = data.get('servingId') ? parseInt(data.get('servingId') as string) : null;
 		const quantity = parseFloat(data.get('quantity') as string) || 1;
 		const customGrams = data.get('customGrams') ? parseFloat(data.get('customGrams') as string) : null;
@@ -144,10 +164,32 @@ export const actions: Actions = {
 		const multiplier = grams / 100;
 		const now = new Date().toISOString();
 
+		// Back-compat: if caller only provides legacy mealTypeId, map it to a day meal for this date.
+		if (!dayMealId && mealTypeId) {
+			const legacy = await db.query.mealTypes.findFirst({ where: eq(mealTypes.id, mealTypeId) });
+			if (legacy) {
+				const existing = await db.query.dayMeals.findFirst({
+					where: and(eq(dayMeals.date, date), eq(dayMeals.name, legacy.name))
+				});
+				if (existing) {
+					dayMealId = existing.id;
+				} else {
+					const max = await db.query.dayMeals.findMany({ where: eq(dayMeals.date, date) });
+					const maxOrder = max.reduce((m, r) => Math.max(m, r.sortOrder ?? 0), 0);
+					const inserted = await db
+						.insert(dayMeals)
+						.values({ date, name: legacy.name, sortOrder: maxOrder + 1 })
+						.returning({ id: dayMeals.id });
+					dayMealId = inserted[0]?.id ?? null;
+				}
+			}
+		}
+
 		await db.insert(foodEntries).values({
 			date,
 			foodId,
 			mealTypeId,
+			dayMealId,
 			servingId,
 			quantity,
 			customGrams,
@@ -175,6 +217,29 @@ export const actions: Actions = {
 		}
 
 		await db.delete(foodEntries).where(eq(foodEntries.id, entryId));
+		return { success: true };
+	},
+
+	addMeal: async ({ request }) => {
+		const data = await request.formData();
+		const date = (data.get('date') as string) || '';
+		const name = ((data.get('name') as string) || '').trim();
+		if (!date) return fail(400, { error: 'Date is required' });
+		if (!name) return fail(400, { error: 'Meal name is required' });
+
+		const existing = await db.query.dayMeals.findMany({ where: eq(dayMeals.date, date) });
+		const maxOrder = existing.reduce((m, r) => Math.max(m, r.sortOrder ?? 0), -1);
+		await db.insert(dayMeals).values({ date, name, sortOrder: maxOrder + 1 });
+		return { success: true };
+	},
+
+	renameMeal: async ({ request }) => {
+		const data = await request.formData();
+		const id = parseInt(data.get('id') as string);
+		const name = ((data.get('name') as string) || '').trim();
+		if (!id) return fail(400, { error: 'Meal id is required' });
+		if (!name) return fail(400, { error: 'Meal name is required' });
+		await db.update(dayMeals).set({ name }).where(eq(dayMeals.id, id));
 		return { success: true };
 	},
 
@@ -343,6 +408,7 @@ export const actions: Actions = {
 				date,
 				foodId: entry.foodId,
 				mealTypeId: entry.mealTypeId,
+				dayMealId: entry.dayMealId,
 				servingId: entry.servingId,
 				quantity: entry.quantity,
 				customGrams: entry.customGrams,

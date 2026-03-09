@@ -1,6 +1,6 @@
 import { db, sqlite } from '$lib/server/db';
 import {
-	foods, foodEntries, dailyTargets, mealTypes,
+	foods, foodEntries, dailyTargets,
 	exercises, workoutTemplates, templateExercises, workouts, workoutSets, personalRecords,
 	supplements, supplementSchedules, supplementLogs,
 	bodyWeights, bodyMeasurements, measurementTypes, bodyComposition, bodyPhotos,
@@ -27,14 +27,14 @@ export const load: PageServerLoad = async () => {
 		db.select({ c: count() }).from(bodyMeasurements).then(r => r[0].c),
 	]);
 
-	const allMealTypes = await db.select().from(mealTypes).orderBy(asc(mealTypes.sortOrder));
+	// Meal types are deprecated in favor of per-day meals (see Calories tab).
 
 	const units = await db.query.appSettings.findFirst({
 		where: eq(appSettings.key, 'unit_system')
 	});
 
 	return {
-		mealTypes: allMealTypes,
+		// mealTypes removed from UI; kept in DB only for back-compat.
 		unitSystem: units?.value === 'imperial' ? 'imperial' : 'metric',
 		stats: {
 			foods: foodCount,
@@ -58,7 +58,6 @@ export const actions: Actions = {
 			foods: await db.select().from(foods),
 			foodEntries: await db.select().from(foodEntries),
 			dailyTargets: await db.select().from(dailyTargets),
-			mealTypes: await db.select().from(mealTypes),
 			exercises: await db.select().from(exercises),
 			workoutTemplates: await db.select().from(workoutTemplates),
 			templateExercises: await db.select().from(templateExercises),
@@ -78,43 +77,6 @@ export const actions: Actions = {
 
 		return { exportJson: JSON.stringify(data, null, 2) };
 	},
-
-	addMealType: async ({ request }) => {
-		const data = await request.formData();
-		const name = data.get('name') as string;
-		const icon = data.get('icon') as string || '🍽️';
-		const sortOrder = parseInt(data.get('sortOrder') as string) || 99;
-
-		if (!name) return fail(400, { error: 'Name is required' });
-
-		await db.insert(mealTypes).values({ name, icon, sortOrder }).onConflictDoNothing();
-		return { success: true };
-	},
-
-	deleteMealType: async ({ request }) => {
-		const data = await request.formData();
-		const id = parseInt(data.get('id') as string);
-		if (!id) return fail(400, { error: 'ID required' });
-
-		// Nullify references in food entries
-		await db.update(foodEntries).set({ mealTypeId: null }).where(eq(foodEntries.mealTypeId, id));
-		await db.delete(mealTypes).where(eq(mealTypes.id, id));
-		return { success: true };
-	},
-
-	editMealType: async ({ request }) => {
-		const data = await request.formData();
-		const id = parseInt(data.get('id') as string);
-		const name = data.get('name') as string;
-		const icon = data.get('icon') as string || '🍽️';
-		const sortOrder = parseInt(data.get('sortOrder') as string) || 99;
-
-		if (!id || !name) return fail(400, { error: 'ID and name required' });
-
-		await db.update(mealTypes).set({ name, icon, sortOrder }).where(eq(mealTypes.id, id));
-		return { success: true };
-	},
-
 	exportCaloriesCSV: async () => {
 		const entries = await db.select({
 			date: foodEntries.date,
@@ -213,7 +175,6 @@ export const actions: Actions = {
 
 			db.delete(foodEntries).run();
 			db.delete(dailyTargets).run();
-			db.delete(mealTypes).run();
 			db.delete(foods).run();
 
 			db.delete(supplementLogs).run();
@@ -235,7 +196,6 @@ export const actions: Actions = {
 			};
 
 			insertMany(foods, payload.foods);
-			insertMany(mealTypes, payload.mealTypes);
 			insertMany(dailyTargets, payload.dailyTargets);
 			insertMany(foodEntries, payload.foodEntries);
 

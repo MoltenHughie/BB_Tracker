@@ -82,7 +82,7 @@ export const dailyTargets = sqliteTable('daily_targets', {
 	note: text('note')
 });
 
-// Meal types
+// Meal types (legacy global meals)
 export const mealTypes = sqliteTable(
 	'meal_types',
 	{
@@ -96,6 +96,21 @@ export const mealTypes = sqliteTable(
 	})
 );
 
+// Per-day meal sections (new)
+export const dayMeals = sqliteTable(
+	'day_meals',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		date: text('date').notNull(), // ISO date
+		name: text('name').notNull(),
+		sortOrder: integer('sort_order').notNull().default(0)
+	},
+	(table) => ({
+		dateIdx: index('day_meals_date_idx').on(table.date),
+		dateSortIdx: index('day_meals_date_sort_idx').on(table.date, table.sortOrder)
+	})
+);
+
 // Food log entries
 export const foodEntries = sqliteTable(
 	'food_entries',
@@ -103,6 +118,7 @@ export const foodEntries = sqliteTable(
 		id: integer('id').primaryKey({ autoIncrement: true }),
 		date: text('date').notNull(), // ISO date
 		mealTypeId: integer('meal_type_id').references(() => mealTypes.id),
+		dayMealId: integer('day_meal_id').references(() => dayMeals.id),
 		foodId: integer('food_id').notNull().references(() => foods.id),
 		servingId: integer('serving_id').references(() => foodServings.id),
 		// Amount consumed
@@ -123,7 +139,8 @@ export const foodEntries = sqliteTable(
 	},
 	(table) => ({
 		dateIdx: index('food_entries_date_idx').on(table.date),
-		dateMealIdx: index('food_entries_date_meal_idx').on(table.date, table.mealTypeId)
+		dateMealIdx: index('food_entries_date_meal_idx').on(table.date, table.mealTypeId),
+		dateDayMealIdx: index('food_entries_date_day_meal_idx').on(table.date, table.dayMealId)
 	})
 );
 

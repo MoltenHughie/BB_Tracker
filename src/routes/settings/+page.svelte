@@ -115,42 +115,7 @@
 		</div>
 	</section>
 
-	<!-- Meal Types -->
-	<section class="card">
-		<h2 class="text-lg font-semibold mb-4">🍽️ Meal Types</h2>
-		<div class="space-y-2 mb-4">
-			{#each data.mealTypes as meal}
-				<div class="flex items-center gap-3 py-2 border-b border-[var(--color-surface-hover)] last:border-0">
-					<span class="text-xl">{meal.icon}</span>
-					<span class="flex-1 font-medium">{meal.name}</span>
-					<span class="text-xs text-[var(--color-text-muted)]">#{meal.sortOrder}</span>
-					<form method="POST" action="?/deleteMealType" use:enhance>
-						<input type="hidden" name="id" value={meal.id} />
-						<button
-							type="submit"
-							class="text-red-400 hover:text-red-300 text-sm"
-							onclick={(e) => { if (!confirm(`Delete "${meal.name}"? Entries will become ungrouped.`)) e.preventDefault(); }}
-						>×</button>
-					</form>
-				</div>
-			{/each}
-		</div>
-		<form method="POST" action="?/addMealType" use:enhance class="flex gap-2 items-end">
-			<div class="w-14">
-				<label for="meal-icon" class="block text-xs text-[var(--color-text-muted)] mb-1">Icon</label>
-				<input id="meal-icon" type="text" name="icon" value="🍽️" maxlength="4" class="input text-center" />
-			</div>
-			<div class="flex-1">
-				<label for="meal-name" class="block text-xs text-[var(--color-text-muted)] mb-1">Name</label>
-				<input id="meal-name" type="text" name="name" required placeholder="e.g., Pre-Workout" class="input" />
-			</div>
-			<div class="w-16">
-				<label for="meal-order" class="block text-xs text-[var(--color-text-muted)] mb-1">Order</label>
-				<input id="meal-order" type="number" name="sortOrder" value="5" min="0" class="input" />
-			</div>
-			<button type="submit" class="btn btn-secondary text-sm px-3 py-2">Add</button>
-		</form>
-	</section>
+	<!-- Meal Types removed (deprecated in favor of per-day meals on Calories tab) -->
 
 	<!-- Exercise catalog (admin) -->
 	<section class="card">

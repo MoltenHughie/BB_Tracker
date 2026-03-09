@@ -39,6 +39,55 @@
 		targetRepsMax: number | null;
 		sortOrder: number | null;
 	}>>([]);
+
+	// Template builder state (create template with inline exercises before saving)
+	type DraftTemplateExercise = {
+		exerciseId: number;
+		targetSets: number;
+		targetRepsMin: number;
+		targetRepsMax: number;
+	};
+	let draftTemplateExerciseId = $state<number | null>(null);
+	let draftTemplateTargetSets = $state(3);
+	let draftTemplateTargetRepsMin = $state(8);
+	let draftTemplateTargetRepsMax = $state(12);
+	let draftTemplateExercises = $state<DraftTemplateExercise[]>([]);
+
+	function addDraftExercise() {
+		if (!draftTemplateExerciseId) return;
+		const exId = draftTemplateExerciseId;
+		if (draftTemplateExercises.some((e) => e.exerciseId === exId)) return;
+		draftTemplateExercises = [
+			...draftTemplateExercises,
+			{
+				exerciseId: exId,
+				targetSets: Math.max(1, draftTemplateTargetSets),
+				targetRepsMin: Math.max(1, draftTemplateTargetRepsMin),
+				targetRepsMax: Math.max(1, draftTemplateTargetRepsMax)
+			}
+		];
+	}
+	function removeDraftExercise(exerciseId: number) {
+		draftTemplateExercises = draftTemplateExercises.filter((e) => e.exerciseId !== exerciseId);
+	}
+	function moveDraftExercise(exerciseId: number, dir: -1 | 1) {
+		const idx = draftTemplateExercises.findIndex((e) => e.exerciseId === exerciseId);
+		if (idx < 0) return;
+		const j = idx + dir;
+		if (j < 0 || j >= draftTemplateExercises.length) return;
+		const copy = [...draftTemplateExercises];
+		const tmp = copy[idx];
+		copy[idx] = copy[j];
+		copy[j] = tmp;
+		draftTemplateExercises = copy;
+	}
+	function resetDraftTemplateBuilder() {
+		draftTemplateExerciseId = null;
+		draftTemplateTargetSets = 3;
+		draftTemplateTargetRepsMin = 8;
+		draftTemplateTargetRepsMax = 12;
+		draftTemplateExercises = [];
+	}
 	let newPRs = $state<Array<{
 		exerciseId: number;
 		exerciseName: string;
@@ -59,10 +108,12 @@
 
 	// Workout summary stats (for finish modal)
 	const workoutTotalVolume = $derived(
-		data.activeWorkout?.sets.reduce((s, set) => s + (set.weight ?? 0) * (set.reps ?? 0), 0) ?? 0
+		data.activeWorkout?.sets
+			.filter((s) => s.isCompleted)
+			.reduce((sum, set) => sum + (set.weight ?? 0) * (set.reps ?? 0), 0) ?? 0
 	);
 	const workoutUniqueExercises = $derived(
-		data.activeWorkout ? new Set(data.activeWorkout.sets.map(s => s.exerciseId)).size : 0
+		data.activeWorkout ? new Set(data.activeWorkout.sets.filter((s) => s.isCompleted).map((s) => s.exerciseId)).size : 0
 	);
 	const workoutElapsedMin = $derived(
 		data.activeWorkout?.startedAt
@@ -108,16 +159,19 @@
 		createExEquipment = entry.equipment ?? 'other';
 	}
 	
-	// Group sets by exercise for the active workout
+	// Group COMPLETED sets by exercise for the active workout
 	const exercisesInWorkout = $derived(() => {
 		if (!data.activeWorkout) return [];
-		
-		const grouped = new Map<number, {
-			exercise: typeof data.allExercises[0],
-			sets: typeof data.activeWorkout.sets
-		}>();
-		
-		for (const set of data.activeWorkout.sets) {
+
+		const grouped = new Map<
+			number,
+			{
+				exercise: typeof data.allExercises[0];
+				sets: typeof data.activeWorkout.sets;
+			}
+		>();
+
+		for (const set of data.activeWorkout.sets.filter((s) => s.isCompleted)) {
 			if (!grouped.has(set.exerciseId)) {
 				grouped.set(set.exerciseId, {
 					exercise: set.exercise,
@@ -126,7 +180,7 @@
 			}
 			grouped.get(set.exerciseId)!.sets.push(set);
 		}
-		
+
 		return Array.from(grouped.values());
 	});
 	
@@ -273,7 +327,14 @@
 		<section class="space-y-4">
 			{#each exercisesInWorkout() as { exercise, sets }}
 				<div class="card">
-					<h3 class="font-semibold mb-3">{exercise.name}</h3>
+					<div class="flex items-center justify-between mb-3">
+						<h3 class="font-semibold">{exercise.name}</h3>
+						<form method="POST" action="?/removeExerciseFromWorkout" use:enhance>
+							<input type="hidden" name="workoutId" value={data.activeWorkout.id} />
+							<input type="hidden" name="exerciseId" value={exercise.id} />
+							<button type="submit" class="text-red-400 hover:text-red-300 text-sm">Remove</button>
+						</form>
+					</div>
 					<div class="space-y-2">
 						{#each sets as set, i}
 							{@const isEditing = editingSetId === set.id}
@@ -301,6 +362,14 @@
 								<form method="POST" action="?/deleteSet" use:enhance>
 									<input type="hidden" name="setId" value={set.id} />
 									<button type="submit" class="text-red-400 hover:text-red-300">×</button>
+								</form>
+
+								<!-- Quick add a new placeholder set for this exercise -->
+								<form method="POST" action="?/addPlaceholderSet" use:enhance>
+									<input type="hidden" name="workoutId" value={data.activeWorkout.id} />
+									<input type="hidden" name="exerciseId" value={exercise.id} />
+									<input type="hidden" name="setType" value="working" />
+									<button type="submit" class="text-[var(--color-primary)] hover:opacity-80 text-sm">+ set</button>
 								</form>
 							</div>
 						{/each}
@@ -340,7 +409,7 @@
 
 		<!-- Add Set Section -->
 		<div class="card">
-			<h3 class="font-semibold mb-3">Log Set</h3>
+			<h3 class="font-semibold mb-3">Complete Set</h3>
 			
 			{#if currentExercise}
 				<div class="mb-4">
@@ -379,15 +448,19 @@
 			{/if}
 			
 			{#if currentExercise}
-				<form 
-					method="POST" 
+				<form
+					method="POST"
 					action="?/addSet"
 					use:enhance={() => {
 						return async ({ update }) => {
 							await update();
-							// Start rest timer after logging set
+							// Start rest timer after completing a set
 							const restTime = getRestTime(currentExercise, newSetType);
 							startRestTimer(restTime);
+							// Reset fields for fast next-entry
+							newWeight = null;
+							newReps = null;
+							newSetType = 'working';
 						};
 					}}
 					class="space-y-4"
@@ -441,11 +514,16 @@
 						<!-- RPE input removed -->
 					</div>
 					
-					<!-- Set number (auto-increment) -->
-					<input type="hidden" name="setNumber" value={(data.activeWorkout?.sets.filter(s => s.exerciseId === currentExercise?.id).length ?? 0) + 1} />
+					<!-- Set number (auto-increment; completed sets only) -->
+					<input
+						type="hidden"
+						name="setNumber"
+						value={(data.activeWorkout?.sets.filter((s) => s.exerciseId === currentExercise?.id && s.isCompleted).length ?? 0) + 1}
+					/>
 					
 					<button type="submit" class="btn btn-primary w-full">
-						Log Set #{(data.activeWorkout?.sets.filter(s => s.exerciseId === currentExercise?.id).length ?? 0) + 1}
+						<span class="text-lg">✓</span>
+						Complete Set #{(data.activeWorkout?.sets.filter((s) => s.exerciseId === currentExercise?.id && s.isCompleted).length ?? 0) + 1}
 					</button>
 				</form>
 			{/if}
@@ -656,6 +734,21 @@
 				<h3 class="text-lg font-semibold">Select Exercise</h3>
 				<button onclick={() => showExerciseModal = false} class="text-2xl">×</button>
 			</div>
+
+			{#if data.activeWorkout}
+				<div class="px-4 pt-3">
+					<form method="POST" action="?/addExerciseToWorkout" use:enhance={() => { return async ({ update }) => { await update(); showExerciseModal = false; }; }} class="p-3 rounded-lg bg-[var(--color-bg)] flex items-center gap-2">
+						<input type="hidden" name="workoutId" value={data.activeWorkout.id} />
+						<select class="input text-sm flex-1" name="exerciseId">
+							{#each data.allExercises as ex (ex.id)}
+								<option value={ex.id}>{ex.name}</option>
+							{/each}
+						</select>
+						<input type="hidden" name="presetSets" value="3" />
+						<button type="submit" class="btn btn-primary text-sm">Add to workout</button>
+					</form>
+				</div>
+			{/if}
 			
 			<div class="flex-1 overflow-y-auto p-4">
 				<ExerciseSearch
@@ -875,15 +968,91 @@
 					</div>
 				{/each}
 				
-				<form 
-					method="POST" 
+				<form
+					method="POST"
 					action="?/createTemplate"
-					use:enhance
+					use:enhance={() => {
+						return async ({ result, update }) => {
+							if (result.type !== 'success') {
+								await update();
+								return;
+							}
+
+							const templateId = (result.data as any)?.templateId as number | undefined;
+							if (!templateId) {
+								await update();
+								return;
+							}
+
+							// Add exercises (in order) if any were drafted
+							for (const e of draftTemplateExercises) {
+								const fd = new FormData();
+								fd.set('templateId', String(templateId));
+								fd.set('exerciseId', String(e.exerciseId));
+								fd.set('targetSets', String(e.targetSets));
+								fd.set('targetRepsMin', String(e.targetRepsMin));
+								fd.set('targetRepsMax', String(e.targetRepsMax));
+								await fetch('?/addExerciseToTemplate', { method: 'POST', body: fd });
+							}
+
+							resetDraftTemplateBuilder();
+							await update();
+						};
+					}}
 					class="card space-y-3"
 				>
 					<h4 class="font-semibold">New Template</h4>
 					<input type="text" name="name" placeholder="Template name" required class="input" />
-					<button type="submit" class="btn btn-primary w-full">Create</button>
+
+					<div class="p-3 rounded-lg bg-[var(--color-bg)] space-y-2">
+						<div class="text-sm font-semibold">Build exercises</div>
+						<div class="grid grid-cols-2 gap-2">
+							<select class="input" bind:value={draftTemplateExerciseId}>
+								<option value={null}>Select exercise…</option>
+								{#each data.allExercises as ex (ex.id)}
+									<option value={ex.id}>{ex.name}</option>
+								{/each}
+							</select>
+							<button type="button" class="btn btn-secondary" onclick={addDraftExercise}>
+								Add
+							</button>
+						</div>
+						<div class="grid grid-cols-3 gap-2">
+							<label class="text-xs text-[var(--color-text-muted)]">
+								Sets
+								<input type="number" class="input text-sm mt-1" min="1" bind:value={draftTemplateTargetSets} />
+							</label>
+							<label class="text-xs text-[var(--color-text-muted)]">
+								Reps min
+								<input type="number" class="input text-sm mt-1" min="1" bind:value={draftTemplateTargetRepsMin} />
+							</label>
+							<label class="text-xs text-[var(--color-text-muted)]">
+								Reps max
+								<input type="number" class="input text-sm mt-1" min="1" bind:value={draftTemplateTargetRepsMax} />
+							</label>
+						</div>
+
+						{#if draftTemplateExercises.length > 0}
+							<div class="space-y-2 pt-2">
+								{#each draftTemplateExercises as e, idx (e.exerciseId)}
+									{@const ex = data.allExercises.find((x) => x.id === e.exerciseId)}
+									<div class="flex items-center gap-2 text-sm">
+										<div class="flex-1">
+											<div class="font-medium">{idx + 1}. {ex?.name ?? `Exercise #${e.exerciseId}`}</div>
+											<div class="text-xs text-[var(--color-text-muted)]">
+												{e.targetSets} × {e.targetRepsMin}-{e.targetRepsMax}
+											</div>
+										</div>
+										<button type="button" class="btn btn-secondary text-xs" onclick={() => moveDraftExercise(e.exerciseId, -1)} disabled={idx === 0}>↑</button>
+										<button type="button" class="btn btn-secondary text-xs" onclick={() => moveDraftExercise(e.exerciseId, 1)} disabled={idx === draftTemplateExercises.length - 1}>↓</button>
+										<button type="button" class="text-red-400 hover:text-red-300 text-sm" onclick={() => removeDraftExercise(e.exerciseId)}>×</button>
+									</div>
+								{/each}
+							</div>
+						{/if}
+					</div>
+
+					<button type="submit" class="btn btn-primary w-full">Create template</button>
 				</form>
 			</div>
 		</div>
