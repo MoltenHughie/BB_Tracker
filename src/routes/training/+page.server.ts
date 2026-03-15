@@ -1,7 +1,8 @@
 import { db } from '$lib/server/db';
-import { 
-	exercises, 
-	workoutTemplates, 
+import {
+	exercises,
+	workoutTemplates,
+	workoutSplits,
 	templateExercises,
 	workouts,
 	workoutSets,
@@ -13,6 +14,11 @@ import { fail } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 
 export const load: PageServerLoad = async () => {
+	// Get all workout splits
+	const splits = await db.query.workoutSplits.findMany({
+		orderBy: asc(workoutSplits.sortOrder)
+	});
+
 	// Get all workout templates
 	const templates = await db.query.workoutTemplates.findMany({
 		with: {
@@ -142,6 +148,7 @@ export const load: PageServerLoad = async () => {
 	}
 
 	return {
+		splits,
 		templates,
 		recentWorkouts,
 		thisWeekWorkouts,
@@ -299,13 +306,17 @@ export const actions: Actions = {
 		const setId = parseInt(data.get('setId') as string);
 		const weight = data.get('weight') ? parseFloat(data.get('weight') as string) : null;
 		const reps = data.get('reps') ? parseInt(data.get('reps') as string) : null;
+		const setType = (data.get('setType') as string) || null;
 
 		if (!setId) {
 			return fail(400, { error: 'Set ID is required' });
 		}
 
+		const updateFields: Record<string, unknown> = { weight, reps };
+		if (setType) updateFields.setType = setType;
+
 		await db.update(workoutSets)
-			.set({ weight, reps })
+			.set(updateFields)
 			.where(eq(workoutSets.id, setId));
 
 		return { success: true };
@@ -655,6 +666,68 @@ export const actions: Actions = {
 		}
 
 		await db.delete(workoutTemplates).where(eq(workoutTemplates.id, templateId));
+		return { success: true };
+	},
+
+	// Create a workout split folder
+	createSplit: async ({ request }) => {
+		const data = await request.formData();
+		const name = data.get('name') as string;
+		const description = (data.get('description') as string) || null;
+		const color = (data.get('color') as string) || '#6366f1';
+
+		if (!name?.trim()) {
+			return fail(400, { error: 'Split name is required' });
+		}
+
+		const now = new Date().toISOString();
+		const existing = await db.query.workoutSplits.findMany();
+		const maxOrder = existing.reduce((m, s) => Math.max(m, s.sortOrder || 0), 0);
+
+		const result = await db.insert(workoutSplits).values({
+			name: name.trim(),
+			description,
+			color,
+			sortOrder: maxOrder + 1,
+			createdAt: now
+		}).returning({ id: workoutSplits.id });
+
+		return { success: true, splitId: result[0].id };
+	},
+
+	// Delete a split folder (templates become standalone — splitId set null by FK)
+	deleteSplit: async ({ request }) => {
+		const data = await request.formData();
+		const splitId = parseInt(data.get('splitId') as string);
+
+		if (!splitId) {
+			return fail(400, { error: 'Split ID is required' });
+		}
+
+		// Detach templates first (ON DELETE SET NULL handles it, but be explicit)
+		await db.update(workoutTemplates)
+			.set({ splitId: null })
+			.where(eq(workoutTemplates.splitId, splitId));
+
+		await db.delete(workoutSplits).where(eq(workoutSplits.id, splitId));
+		return { success: true };
+	},
+
+	// Assign a template to a split (or remove from split with splitId=null)
+	assignTemplateToSplit: async ({ request }) => {
+		const data = await request.formData();
+		const templateId = parseInt(data.get('templateId') as string);
+		const splitIdRaw = data.get('splitId');
+		const splitId = splitIdRaw ? parseInt(splitIdRaw as string) : null;
+
+		if (!templateId) {
+			return fail(400, { error: 'Template ID is required' });
+		}
+
+		await db.update(workoutTemplates)
+			.set({ splitId })
+			.where(eq(workoutTemplates.id, templateId));
+
 		return { success: true };
 	},
 

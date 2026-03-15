@@ -153,6 +153,50 @@
 			isSaving = false;
 		}
 	}
+
+	// Drag-to-reorder meals
+	let draggingMealId = $state<number | null>(null);
+	let dragOverMealId = $state<number | null>(null);
+
+	function onMealDragStart(e: DragEvent, mealId: number) {
+		draggingMealId = mealId;
+		if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+	}
+
+	function onMealDragOver(e: DragEvent, mealId: number) {
+		e.preventDefault();
+		if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+		dragOverMealId = mealId;
+	}
+
+	function onMealDragLeave() {
+		dragOverMealId = null;
+	}
+
+	async function onMealDrop(e: DragEvent, targetMealId: number) {
+		e.preventDefault();
+		dragOverMealId = null;
+		if (draggingMealId === null || draggingMealId === targetMealId) {
+			draggingMealId = null;
+			return;
+		}
+		const newOrder = [...data.meals];
+		const fromIdx = newOrder.findIndex(m => m.id === draggingMealId);
+		const toIdx = newOrder.findIndex(m => m.id === targetMealId);
+		const [item] = newOrder.splice(fromIdx, 1);
+		newOrder.splice(toIdx, 0, item);
+		draggingMealId = null;
+
+		const formData = new FormData();
+		formData.append('orderedIds', JSON.stringify(newOrder.map(m => m.id)));
+		await fetch('?/reorderMeals', { method: 'POST', body: formData });
+		await refreshPage();
+	}
+
+	function onMealDragEnd() {
+		draggingMealId = null;
+		dragOverMealId = null;
+	}
 </script>
 
 <div class="space-y-6 pb-4">
@@ -268,19 +312,45 @@
 	{/if}
 
 	<!-- Meals list -->
-	<form method="POST" action="?/addMeal" use:enhance={() => { return async ({ update }) => { await update(); await refreshPage(); }; }} class="card p-3 flex items-center gap-2">
-		<input type="hidden" name="date" value={data.date} />
-		<input type="text" name="name" class="input text-sm flex-1" placeholder="Add meal…" required />
-		<button type="submit" class="btn btn-primary text-sm">Add Meal</button>
-	</form>
+	<div class="flex gap-2 items-stretch">
+		<form method="POST" action="?/addMeal" use:enhance={() => { return async ({ update }) => { await update(); await refreshPage(); }; }} class="card p-3 flex items-center gap-2 flex-1">
+			<input type="hidden" name="date" value={data.date} />
+			<input type="text" name="name" class="input text-sm flex-1" placeholder="Add meal…" required />
+			<button type="submit" class="btn btn-primary text-sm">Add Meal</button>
+		</form>
+		{#if data.meals.length > 0}
+			<form method="POST" action="?/saveDefaultMeals" use:enhance={() => { return async ({ result, update }) => { await update(); if (result.type === 'success') pushToast({ kind: 'success', message: 'Saved as default for new days' }); }; }}>
+				<input type="hidden" name="date" value={data.date} />
+				<button
+					type="submit"
+					class="card h-full px-3 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors whitespace-nowrap"
+					title="Save current meals as default for new days"
+				>
+					⭐ Set default
+				</button>
+			</form>
+		{/if}
+	</div>
 
 	<section class="space-y-4">
 		{#each data.meals as meal}
 			{@const mealEntries = entriesByMeal().get(meal.id) ?? []}
 			{@const mealCalories = mealEntries.reduce((sum, e) => sum + (e.calories || 0), 0)}
-			
-			<div class="card">
-				<div class="flex items-center justify-between mb-3 gap-3">
+
+			<div
+				role="listitem"
+				class="card transition-opacity {draggingMealId === meal.id ? 'opacity-40' : ''} {dragOverMealId === meal.id && draggingMealId !== meal.id ? 'ring-2 ring-[var(--color-primary)]' : ''}"
+				draggable="true"
+				ondragstart={(e) => onMealDragStart(e, meal.id)}
+				ondragover={(e) => onMealDragOver(e, meal.id)}
+				ondragleave={onMealDragLeave}
+				ondrop={(e) => onMealDrop(e, meal.id)}
+				ondragend={onMealDragEnd}
+			>
+				<div class="flex items-center justify-between mb-3 gap-2">
+					<!-- Drag handle -->
+					<span class="text-[var(--color-text-muted)] cursor-grab active:cursor-grabbing select-none px-1 text-lg leading-none" title="Drag to reorder">⋮⋮</span>
+
 					<form method="POST" action="?/renameMeal" use:enhance={() => { return async ({ update }) => { await update(); await refreshPage(); }; }} class="flex items-center gap-2 flex-1 min-w-0">
 						<input type="hidden" name="id" value={meal.id} />
 						<input name="name" class="input text-sm font-semibold flex-1 min-w-0" value={meal.name} />
@@ -288,6 +358,25 @@
 							<span class="text-sm text-[var(--color-text-muted)] whitespace-nowrap">{Math.round(mealCalories)} kcal</span>
 						{/if}
 					</form>
+
+					<!-- Delete meal -->
+					<form method="POST" action="?/deleteMeal" use:enhance={() => { return async ({ update }) => { await update(); await refreshPage(); }; }}>
+						<input type="hidden" name="id" value={meal.id} />
+						<button
+							type="submit"
+							onclick={(e) => {
+								const msg = mealEntries.length > 0
+									? `Delete "${meal.name}" and its ${mealEntries.length} food entr${mealEntries.length === 1 ? 'y' : 'ies'}?`
+									: `Delete "${meal.name}"?`;
+								if (!confirm(msg)) e.preventDefault();
+							}}
+							class="text-[var(--color-text-muted)] hover:text-red-400 p-1 transition-colors"
+							title="Delete meal"
+						>
+							🗑
+						</button>
+					</form>
+
 					<button onclick={() => openAddFoodModal(meal.id)} class="btn btn-secondary text-sm px-3 py-1">
 						+ Add
 					</button>

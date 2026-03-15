@@ -21,12 +21,31 @@
 	let newServingSize = $state('');
 	let newConcentration = $state('');
 	let newIsPed = $state(false);
-	let newIsRx = $state(false);
 	let newNotes = $state('');
 	let newCalories = $state<number | null>(null);
 	let newProtein = $state<number | null>(null);
 	let newCarbs = $state<number | null>(null);
 	let newFat = $state<number | null>(null);
+
+	// Nutrient rows for vitamin/mineral/other
+	type NutrientRow = { name: string; amount: string; unit: string };
+	let newNutrients = $state<NutrientRow[]>([]);
+	let editNutrients = $state<NutrientRow[]>([]);
+
+	const vitaminSuggestions = ['Vitamin A', 'Vitamin B1 (Thiamine)', 'Vitamin B2 (Riboflavin)', 'Vitamin B3 (Niacin)', 'Vitamin B5', 'Vitamin B6', 'Vitamin B7 (Biotin)', 'Vitamin B9 (Folate)', 'Vitamin B12', 'Vitamin C', 'Vitamin D', 'Vitamin D3', 'Vitamin E', 'Vitamin K', 'Vitamin K2'];
+	const mineralSuggestions = ['Calcium', 'Chromium', 'Copper', 'Iodine', 'Iron', 'Magnesium', 'Manganese', 'Phosphorus', 'Potassium', 'Selenium', 'Sodium', 'Zinc'];
+	const showNutrientFields = $derived(() => ['vitamin', 'mineral', 'other'].includes(newCategory));
+	const showEditNutrientFields = $derived(() => ['vitamin', 'mineral', 'other'].includes(editCategory));
+	const nutrientSuggestions = $derived(() =>
+		newCategory === 'vitamin' ? vitaminSuggestions :
+		newCategory === 'mineral' ? mineralSuggestions :
+		[...vitaminSuggestions, ...mineralSuggestions]
+	);
+	const editNutrientSuggestions = $derived(() =>
+		editCategory === 'vitamin' ? vitaminSuggestions :
+		editCategory === 'mineral' ? mineralSuggestions :
+		[...vitaminSuggestions, ...mineralSuggestions]
+	);
 	
 	// Form states for schedule
 	let schedName = $state('');
@@ -114,12 +133,12 @@
 		newServingSize = '';
 		newConcentration = '';
 		newIsPed = false;
-		newIsRx = false;
 		newNotes = '';
 		newCalories = null;
 		newProtein = null;
 		newCarbs = null;
 		newFat = null;
+		newNutrients = [];
 	}
 	
 	function resetScheduleForm() {
@@ -141,7 +160,6 @@
 	let editServingSize = $state('');
 	let editConcentration = $state('');
 	let editIsPed = $state(false);
-	let editIsRx = $state(false);
 	let editNotes = $state('');
 	let editCalories = $state<number | null>(null);
 	let editProtein = $state<number | null>(null);
@@ -162,12 +180,16 @@
 		editServingSize = supp.servingSize || '';
 		editConcentration = supp.concentration || '';
 		editIsPed = supp.isPed ?? false;
-		editIsRx = supp.isRx ?? false;
 		editNotes = supp.notes || '';
 		editCalories = supp.calories ?? null;
 		editProtein = supp.protein ?? null;
 		editCarbs = supp.carbs ?? null;
 		editFat = supp.fat ?? null;
+		try {
+			editNutrients = (supp as any).nutrients ? JSON.parse((supp as any).nutrients) : [];
+		} catch {
+			editNutrients = [];
+		}
 		editMode = true;
 	}
 
@@ -416,9 +438,6 @@
 									{#if supp.isPed}
 										<span class="text-xs px-1.5 py-0.5 bg-red-500/20 text-red-400 rounded">PED</span>
 									{/if}
-									{#if supp.isRx}
-										<span class="text-xs px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded">Rx</span>
-									{/if}
 								</div>
 								<div class="text-sm text-[var(--color-text-muted)]">
 									{#if supp.brand}
@@ -591,16 +610,6 @@
 						/>
 						<span class="text-sm">PED/Hormone</span>
 					</label>
-					<label class="flex items-center gap-2 cursor-pointer">
-						<input 
-							type="checkbox" 
-							name="isRx" 
-							bind:checked={newIsRx}
-							value="true"
-							class="w-4 h-4"
-						/>
-						<span class="text-sm">Prescription</span>
-					</label>
 				</div>
 				
 				<!-- Nutritional content per serving (for auto-logging to calories) -->
@@ -626,6 +635,35 @@
 					</div>
 				</div>
 
+				<!-- Micronutrients (vitamin / mineral / other categories) -->
+				{#if showNutrientFields()}
+					<div>
+						<div class="flex items-center justify-between mb-2">
+							<p class="text-sm text-[var(--color-text-muted)]">Micronutrients per serving</p>
+							<button type="button" class="text-sm text-[var(--color-primary)] hover:opacity-80"
+								onclick={() => newNutrients = [...newNutrients, { name: '', amount: '', unit: 'mg' }]}>
+								+ Add nutrient
+							</button>
+						</div>
+						<datalist id="new-nutrient-suggestions">
+							{#each nutrientSuggestions() as s}<option value={s}></option>{/each}
+						</datalist>
+						{#each newNutrients as row, i}
+							<div class="flex gap-1.5 mb-1.5 items-center">
+								<input type="text" list="new-nutrient-suggestions" bind:value={row.name} placeholder="e.g. Vitamin C" class="input text-sm flex-1" />
+								<input type="number" bind:value={row.amount} placeholder="amount" min="0" step="0.001" class="input text-sm w-20" />
+								<select bind:value={row.unit} class="input text-sm w-16">
+									<option value="mg">mg</option>
+									<option value="mcg">mcg</option>
+									<option value="IU">IU</option>
+									<option value="g">g</option>
+								</select>
+								<button type="button" onclick={() => newNutrients = newNutrients.filter((_, j) => j !== i)} class="text-red-400 hover:text-red-300 text-lg leading-none">×</button>
+							</div>
+						{/each}
+						<input type="hidden" name="nutrients" value={JSON.stringify(newNutrients.filter(r => r.name && r.amount))} />
+					</div>
+				{/if}
 				<div>
 					<label for="supp-notes" class="block text-sm mb-2">Notes</label>
 					<textarea 
@@ -723,14 +761,6 @@
 						</div>
 					</div>
 					<div class="flex gap-4">
-						<label class="flex items-center gap-2 cursor-pointer">
-							<input type="checkbox" name="isPed" bind:checked={editIsPed} value="true" class="w-4 h-4" />
-							<span class="text-sm">PED</span>
-						</label>
-						<label class="flex items-center gap-2 cursor-pointer">
-							<input type="checkbox" name="isRx" bind:checked={editIsRx} value="true" class="w-4 h-4" />
-							<span class="text-sm">Prescription</span>
-						</label>
 					</div>
 					<div>
 						<p class="text-sm text-[var(--color-text-muted)] mb-1">Nutrition per serving <span class="text-xs">(auto-logs to calories)</span></p>
@@ -753,6 +783,35 @@
 							</div>
 						</div>
 					</div>
+					<!-- Micronutrients (vitamin / mineral / other categories) -->
+					{#if showEditNutrientFields()}
+						<div>
+							<div class="flex items-center justify-between mb-2">
+								<p class="text-sm text-[var(--color-text-muted)]">Micronutrients per serving</p>
+								<button type="button" class="text-sm text-[var(--color-primary)] hover:opacity-80"
+									onclick={() => editNutrients = [...editNutrients, { name: '', amount: '', unit: 'mg' }]}>
+									+ Add nutrient
+								</button>
+							</div>
+							<datalist id="edit-nutrient-suggestions">
+								{#each editNutrientSuggestions() as s}<option value={s}></option>{/each}
+							</datalist>
+							{#each editNutrients as row, i}
+								<div class="flex gap-1.5 mb-1.5 items-center">
+									<input type="text" list="edit-nutrient-suggestions" bind:value={row.name} placeholder="e.g. Vitamin C" class="input text-sm flex-1" />
+									<input type="number" bind:value={row.amount} placeholder="amount" min="0" step="0.001" class="input text-sm w-20" />
+									<select bind:value={row.unit} class="input text-sm w-16">
+										<option value="mg">mg</option>
+										<option value="mcg">mcg</option>
+										<option value="IU">IU</option>
+										<option value="g">g</option>
+									</select>
+									<button type="button" onclick={() => editNutrients = editNutrients.filter((_, j) => j !== i)} class="text-red-400 hover:text-red-300 text-lg leading-none">×</button>
+								</div>
+							{/each}
+							<input type="hidden" name="nutrients" value={JSON.stringify(editNutrients.filter(r => r.name && r.amount))} />
+						</div>
+					{/if}
 					<div>
 						<label for="edit-notes" class="block text-sm mb-1">Notes</label>
 						<textarea id="edit-notes" name="notes" bind:value={editNotes} class="input h-20 resize-none"></textarea>
@@ -790,6 +849,19 @@
 						</div>
 					{/if}
 					{#if selectedSupplement.notes}
+					{#if (selectedSupplement as any).nutrients}
+						{@const parsedNutrients = (() => { try { return JSON.parse((selectedSupplement as any).nutrients); } catch { return []; } })()}
+						{#if Array.isArray(parsedNutrients) && parsedNutrients.length > 0}
+							<div class="pt-2 border-t border-[var(--color-surface-hover)]">
+								<span class="text-[var(--color-text-muted)]">Micronutrients:</span>
+								<div class="mt-1 flex flex-wrap gap-1.5">
+									{#each parsedNutrients as n}
+										<span class="text-xs px-2 py-0.5 rounded bg-[var(--color-bg)]">{n.name}: {n.amount} {n.unit}</span>
+									{/each}
+								</div>
+							</div>
+						{/if}
+					{/if}
 						<div class="pt-2 border-t border-[var(--color-surface-hover)]">
 							<span class="text-[var(--color-text-muted)]">Notes:</span>
 							<p class="mt-1">{selectedSupplement.notes}</p>

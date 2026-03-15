@@ -1,5 +1,5 @@
 import { db } from '$lib/server/db';
-import { foods, foodEntries, mealTypes, dayMeals, dailyTargets } from '$lib/server/db/schema';
+import { foods, foodEntries, mealTypes, dayMeals, dailyTargets, appSettings } from '$lib/server/db/schema';
 import { eq, and, desc, asc, gte, sql } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
@@ -23,22 +23,36 @@ export const load: PageServerLoad = async ({ url }) => {
 		orderBy: asc(dayMeals.sortOrder)
 	});
 
-	// Back-compat: if no day meals exist yet, create defaults based on legacy meal_types.
+	// Seed default meals for new days (no meals yet).
 	if (meals.length === 0) {
-		const legacyMeals = await db.query.mealTypes.findMany({ orderBy: asc(mealTypes.sortOrder) });
-		if (legacyMeals.length > 0) {
-			await db.insert(dayMeals).values(
-				legacyMeals.map((m) => ({
-					date,
-					name: m.name,
-					sortOrder: m.sortOrder ?? 0
-				}))
-			);
-			meals = await db.query.dayMeals.findMany({
-				where: eq(dayMeals.date, date),
-				orderBy: asc(dayMeals.sortOrder)
-			});
+		// 1. Try user-defined default meal template.
+		const defaultSetting = await db.query.appSettings.findFirst({
+			where: eq(appSettings.key, 'default_meals')
+		});
+		if (defaultSetting?.value) {
+			try {
+				const defaults: { name: string }[] = JSON.parse(defaultSetting.value);
+				if (Array.isArray(defaults) && defaults.length > 0) {
+					await db.insert(dayMeals).values(
+						defaults.map((m, i) => ({ date, name: m.name, sortOrder: i }))
+					);
+				}
+			} catch {
+				// ignore malformed JSON
+			}
+		} else {
+			// 2. Fall back to legacy mealTypes for back-compat.
+			const legacyMeals = await db.query.mealTypes.findMany({ orderBy: asc(mealTypes.sortOrder) });
+			if (legacyMeals.length > 0) {
+				await db.insert(dayMeals).values(
+					legacyMeals.map((m) => ({ date, name: m.name, sortOrder: m.sortOrder ?? 0 }))
+				);
+			}
 		}
+		meals = await db.query.dayMeals.findMany({
+			where: eq(dayMeals.date, date),
+			orderBy: asc(dayMeals.sortOrder)
+		});
 	}
 
 	// Get food entries for this date with relations
@@ -111,6 +125,10 @@ export const load: PageServerLoad = async ({ url }) => {
 		days: daysWithData.length
 	} : null;
 
+	const defaultMealsSetting = await db.query.appSettings.findFirst({
+		where: eq(appSettings.key, 'default_meals')
+	});
+
 	return {
 		date,
 		target,
@@ -119,7 +137,8 @@ export const load: PageServerLoad = async ({ url }) => {
 		allFoods,
 		recentFoodIds,
 		totals,
-		weeklyAvg
+		weeklyAvg,
+		defaultMealsJson: defaultMealsSetting?.value ?? null
 	};
 };
 
@@ -240,6 +259,57 @@ export const actions: Actions = {
 		if (!id) return fail(400, { error: 'Meal id is required' });
 		if (!name) return fail(400, { error: 'Meal name is required' });
 		await db.update(dayMeals).set({ name }).where(eq(dayMeals.id, id));
+		return { success: true };
+	},
+
+	deleteMeal: async ({ request }) => {
+		const data = await request.formData();
+		const id = parseInt(data.get('id') as string);
+		if (!id) return fail(400, { error: 'Meal id is required' });
+
+		const meal = await db.query.dayMeals.findFirst({ where: eq(dayMeals.id, id) });
+		if (!meal) return fail(404, { error: 'Meal not found' });
+
+		const siblings = await db.query.dayMeals.findMany({ where: eq(dayMeals.date, meal.date) });
+		if (siblings.length <= 1) return fail(400, { error: 'Cannot delete the last meal of the day' });
+
+		await db.delete(foodEntries).where(eq(foodEntries.dayMealId, id));
+		await db.delete(dayMeals).where(eq(dayMeals.id, id));
+		return { success: true };
+	},
+
+	reorderMeals: async ({ request }) => {
+		const data = await request.formData();
+		const raw = data.get('orderedIds') as string;
+		if (!raw) return fail(400, { error: 'orderedIds is required' });
+		const orderedIds = JSON.parse(raw) as number[];
+		for (let i = 0; i < orderedIds.length; i++) {
+			await db.update(dayMeals).set({ sortOrder: i }).where(eq(dayMeals.id, orderedIds[i]));
+		}
+		return { success: true };
+	},
+
+	saveDefaultMeals: async ({ request }) => {
+		const data = await request.formData();
+		const date = data.get('date') as string;
+		if (!date) return fail(400, { error: 'Date is required' });
+
+		const meals = await db.query.dayMeals.findMany({
+			where: eq(dayMeals.date, date),
+			orderBy: asc(dayMeals.sortOrder)
+		});
+
+		const defaultsJson = JSON.stringify(meals.map(m => ({ name: m.name })));
+		const now = new Date().toISOString();
+
+		const existing = await db.query.appSettings.findFirst({
+			where: eq(appSettings.key, 'default_meals')
+		});
+		if (existing) {
+			await db.update(appSettings).set({ value: defaultsJson, updatedAt: now }).where(eq(appSettings.key, 'default_meals'));
+		} else {
+			await db.insert(appSettings).values({ key: 'default_meals', value: defaultsJson, updatedAt: now });
+		}
 		return { success: true };
 	},
 

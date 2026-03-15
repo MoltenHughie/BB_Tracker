@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { createEventDispatcher } from 'svelte';
-
 	type Exercise = {
 		id: number;
 		name: string;
@@ -22,20 +20,20 @@
 		catalogEntries?: CatalogEntry[];
 		historyHrefForExerciseId?: ((id: number) => string) | null;
 		catalogLimit?: number;
+		onselectExercise?: (exercise: Exercise) => void;
+		onprefillFromCatalog?: (entry: CatalogEntry) => void;
+		oncreateCustomRequested?: () => void;
 	}
 
 	let {
 		exercises,
 		catalogEntries = [],
 		historyHrefForExerciseId = null,
-		catalogLimit = 25
+		catalogLimit = 25,
+		onselectExercise,
+		onprefillFromCatalog,
+		oncreateCustomRequested
 	} = $props();
-
-	const dispatch = createEventDispatcher<{
-		selectExercise: Exercise;
-		prefillFromCatalog: CatalogEntry;
-		createCustomRequested: void;
-	}>();
 
 	let query = $state('');
 	let category = $state<string | null>(null);
@@ -93,7 +91,7 @@
 				<div class="flex items-stretch gap-2">
 					<button
 						type="button"
-						onclick={() => dispatch('selectExercise', ex as Exercise)}
+						onclick={() => onselectExercise?.(ex as Exercise)}
 						class="flex-1 text-left p-3 rounded-lg hover:bg-[var(--color-surface-hover)] transition-colors"
 					>
 						<div class="font-medium">{ex.name}</div>
@@ -124,7 +122,7 @@
 					<li>
 						<button
 							type="button"
-							onclick={() => dispatch('prefillFromCatalog', entry)}
+							onclick={() => onprefillFromCatalog?.(entry)}
 							class="w-full text-left p-3 rounded-lg bg-[var(--color-bg)] hover:bg-[var(--color-surface-hover)] transition-colors"
 						>
 							<div class="font-medium">{entry.name}</div>
@@ -140,7 +138,7 @@
 
 	<button
 		type="button"
-		onclick={() => dispatch('createCustomRequested')}
+		onclick={() => oncreateCustomRequested?.()}
 		class="w-full text-center p-2 rounded-lg border border-dashed border-[var(--color-surface-hover)] text-sm text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] transition-colors"
 	>
 		+ Create Custom Exercise
