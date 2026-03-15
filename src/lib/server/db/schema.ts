@@ -191,9 +191,20 @@ export const exerciseCatalog = sqliteTable(
 	})
 );
 
+// Workout split folders (groups of related templates)
+export const workoutSplits = sqliteTable('workout_splits', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	name: text('name').notNull(), // e.g., "PPL Split", "Arnold Split"
+	description: text('description'),
+	color: text('color'),
+	sortOrder: integer('sort_order').default(0),
+	createdAt: text('created_at').notNull()
+});
+
 // Workout templates (splits)
 export const workoutTemplates = sqliteTable('workout_templates', {
 	id: integer('id').primaryKey({ autoIncrement: true }),
+	splitId: integer('split_id').references(() => workoutSplits.id, { onDelete: 'set null' }),
 	name: text('name').notNull(), // e.g., "Push Day", "Leg Day"
 	description: text('description'),
 	color: text('color'), // hex color for UI
@@ -317,6 +328,8 @@ export const supplements = sqliteTable('supplements', {
 	protein: real('protein'),
 	carbs: real('carbs'),
 	fat: real('fat'),
+	// Micronutrient content per serving (JSON: [{name, amount, unit}])
+	nutrients: text('nutrients'),
 	// Flags
 	isPed: integer('is_ped', { mode: 'boolean' }).default(false),
 	isRx: integer('is_rx', { mode: 'boolean' }).default(false), // prescription
@@ -480,7 +493,12 @@ export const foodEntriesRelations = relations(foodEntries, ({ one }) => ({
 	mealType: one(mealTypes, { fields: [foodEntries.mealTypeId], references: [mealTypes.id] })
 }));
 
-export const workoutTemplatesRelations = relations(workoutTemplates, ({ many }) => ({
+export const workoutSplitsRelations = relations(workoutSplits, ({ many }) => ({
+	templates: many(workoutTemplates)
+}));
+
+export const workoutTemplatesRelations = relations(workoutTemplates, ({ one, many }) => ({
+	split: one(workoutSplits, { fields: [workoutTemplates.splitId], references: [workoutSplits.id] }),
 	exercises: many(templateExercises),
 	workouts: many(workouts)
 }));

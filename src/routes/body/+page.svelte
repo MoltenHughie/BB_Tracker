@@ -15,7 +15,7 @@
 	let showGoalModal = $state(false);
 	
 	// Active tab
-	let activeTab = $state<'weight' | 'measurements' | 'composition' | 'photos'>('weight');
+	let activeTab = $state<'weight' | 'measurements' | 'composition' | 'photos' | 'charts'>('weight');
 	let showPhotoModal = $state(false);
 	let compareMode = $state(false);
 	let comparePhotos = $state<number[]>([]);
@@ -115,6 +115,39 @@
 		if (!showGoalModal) goalInput = data.weightGoal;
 	});
 
+	// History modal metric selector
+	type HistoryMetric = 'weight' | `measure_${number}` | 'body_fat' | 'muscle_mass';
+	let historyMetric = $state<HistoryMetric>('weight');
+
+	const historyEntries = $derived((): { date: string; label: string; sublabel?: string }[] => {
+		if (historyMetric === 'weight') {
+			return data.weights.map(w => ({
+				date: w.date,
+				label: formatWeight(w.weight),
+				sublabel: [w.time ? `@ ${w.time}` : '', w.condition || ''].filter(Boolean).join(' • ')
+			}));
+		}
+		if (historyMetric === 'body_fat') {
+			return data.compositionHistory
+				.filter(c => c.bodyFatPercent != null)
+				.map(c => ({ date: c.date, label: `${c.bodyFatPercent}%`, sublabel: c.method ?? '' }));
+		}
+		if (historyMetric === 'muscle_mass') {
+			return data.compositionHistory
+				.filter(c => c.muscleMassKg != null)
+				.map(c => ({ date: c.date, label: `${c.muscleMassKg} ${weightUnit()}`, sublabel: c.method ?? '' }));
+		}
+		if (historyMetric.startsWith('measure_')) {
+			const typeId = parseInt(historyMetric.replace('measure_', ''));
+			const type = data.measureTypes.find(t => t.id === typeId);
+			return (data.measurementHistory[typeId] ?? []).map(m => ({
+				date: m.date,
+				label: `${m.value} ${type?.unit ?? 'cm'}`
+			}));
+		}
+		return [];
+	});
+
 	// Sparkline path helper for measurement history
 	function sparklinePath(points: { date: string; value: number }[], w: number, h: number): string {
 		if (points.length < 2) return '';
@@ -130,6 +163,72 @@
 		}).join(' ');
 	}
 	
+	// Charts tab state
+	type ChartMetric = 'weight' | `measure_${number}` | 'body_fat' | 'muscle_mass';
+	type ChartRange = '1w' | '1m' | '3m' | '6m' | 'all';
+	let chartMetric = $state<ChartMetric>('weight');
+	let chartRange = $state<ChartRange>('1m');
+
+	const chartData = $derived((): { date: string; value: number }[] => {
+		let raw: { date: string; value: number }[] = [];
+		if (chartMetric === 'weight') {
+			raw = data.weights.map(w => ({ date: w.date, value: w.weight }));
+		} else if (chartMetric === 'body_fat') {
+			raw = data.compositionHistory.filter(c => c.bodyFatPercent != null).map(c => ({ date: c.date, value: c.bodyFatPercent! }));
+		} else if (chartMetric === 'muscle_mass') {
+			raw = data.compositionHistory.filter(c => c.muscleMassKg != null).map(c => ({ date: c.date, value: c.muscleMassKg! }));
+		} else if (chartMetric.startsWith('measure_')) {
+			const typeId = parseInt(chartMetric.replace('measure_', ''));
+			raw = data.measurementHistory[typeId] ?? [];
+		}
+		raw = [...raw].sort((a, b) => a.date.localeCompare(b.date));
+		if (chartRange !== 'all') {
+			const days = ({ '1w': 7, '1m': 30, '3m': 90, '6m': 180 } as Record<string, number>)[chartRange] ?? 30;
+			const cutoff = new Date();
+			cutoff.setDate(cutoff.getDate() - days);
+			const cutoffStr = cutoff.toISOString().split('T')[0];
+			raw = raw.filter(p => p.date >= cutoffStr);
+		}
+		return raw;
+	});
+
+	function chartUnit(): string {
+		if (chartMetric === 'weight') return weightUnit();
+		if (chartMetric === 'body_fat') return '%';
+		if (chartMetric === 'muscle_mass') return weightUnit();
+		if (chartMetric.startsWith('measure_')) {
+			const typeId = parseInt(chartMetric.replace('measure_', ''));
+			return data.measureTypes.find(t => t.id === typeId)?.unit ?? '';
+		}
+		return '';
+	}
+
+	function chartMetricLabel(): string {
+		if (chartMetric === 'weight') return 'Weight';
+		if (chartMetric === 'body_fat') return 'Body Fat %';
+		if (chartMetric === 'muscle_mass') return 'Muscle Mass';
+		if (chartMetric.startsWith('measure_')) {
+			const typeId = parseInt(chartMetric.replace('measure_', ''));
+			return data.measureTypes.find(t => t.id === typeId)?.name ?? 'Measurement';
+		}
+		return '';
+	}
+
+	const chartMetricOptions = $derived((): { key: string; label: string }[] => [
+		{ key: 'weight', label: '⚖️ Weight' },
+		...(data.compositionHistory.some(c => c.bodyFatPercent != null) ? [{ key: 'body_fat', label: '🔬 Body Fat %' }] : []),
+		...(data.compositionHistory.some(c => c.muscleMassKg != null) ? [{ key: 'muscle_mass', label: '💪 Muscle Mass' }] : []),
+		...data.measureTypes.map(t => ({ key: `measure_${t.id}`, label: `${t.icon || '📏'} ${t.name}` }))
+	]);
+
+	const chartRangeOptions: { key: ChartRange; label: string }[] = [
+		{ key: '1w', label: '1W' },
+		{ key: '1m', label: '1M' },
+		{ key: '3m', label: '3M' },
+		{ key: '6m', label: '6M' },
+		{ key: 'all', label: 'All' }
+	];
+
 	function resetWeightForm() {
 		weightValue = data.latestWeight?.weight ?? null;
 		weightTime = '';
@@ -174,16 +273,17 @@
 	</header>
 
 	<!-- Tab navigation -->
-	<div class="flex gap-2">
+	<div class="flex gap-2 overflow-x-auto pb-1 -mb-1">
 		{#each [
 			{ key: 'weight', label: 'Weight', icon: '⚖️' },
 			{ key: 'measurements', label: 'Measurements', icon: '📐' },
 			{ key: 'composition', label: 'Composition', icon: '🔬' },
-			{ key: 'photos', label: 'Photos', icon: '📸' }
+			{ key: 'photos', label: 'Photos', icon: '📸' },
+			{ key: 'charts', label: 'Charts', icon: '📈' }
 		] as tab}
 			<button
 				onclick={() => activeTab = tab.key as typeof activeTab}
-				class="flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors {activeTab === tab.key
+				class="shrink-0 py-2 px-3 rounded-lg text-sm font-medium transition-colors {activeTab === tab.key
 					? 'bg-[var(--color-primary)] text-white'
 					: 'bg-[var(--color-surface)] text-[var(--color-text-muted)]'}"
 			>
@@ -657,8 +757,114 @@
 				</div>
 			{/if}
 		</section>
+	{:else if activeTab === 'charts'}
+		<!-- CHARTS TAB -->
+
+		<!-- Metric buttons -->
+		<div class="flex flex-wrap gap-2">
+			{#each chartMetricOptions() as { key, label }}
+				<button
+					onclick={() => chartMetric = key as ChartMetric}
+					class="px-3 py-1 rounded-full text-sm transition-colors {chartMetric === key
+						? 'bg-[var(--color-primary)] text-white'
+						: 'bg-[var(--color-surface)] text-[var(--color-text-muted)]'}"
+				>
+					{label}
+				</button>
+			{/each}
+		</div>
+
+		<!-- Time range buttons -->
+		<div class="flex gap-2">
+			{#each chartRangeOptions as { key, label }}
+				<button
+					onclick={() => chartRange = key}
+					class="flex-1 py-1.5 rounded-lg text-sm font-medium transition-colors {chartRange === key
+						? 'bg-[var(--color-primary)]/20 text-[var(--color-primary)]'
+						: 'bg-[var(--color-surface)] text-[var(--color-text-muted)]'}"
+				>
+					{label}
+				</button>
+			{/each}
+		</div>
+
+		<!-- Chart -->
+		{@const cd = chartData()}
+		{#if cd.length >= 2}
+			{@const W = 320}
+			{@const H = 180}
+			{@const padL = 46}
+			{@const padR = 12}
+			{@const padT = 12}
+			{@const padB = 28}
+			{@const plotW = W - padL - padR}
+			{@const plotH = H - padT - padB}
+			{@const vals = cd.map(p => p.value)}
+			{@const minV = Math.min(...vals)}
+			{@const maxV = Math.max(...vals)}
+			{@const vRange = maxV === minV ? 1 : maxV - minV}
+			{@const n = cd.length}
+
+			<section class="card overflow-hidden">
+				<div class="flex items-center justify-between mb-2">
+					<h2 class="text-sm font-semibold">{chartMetricLabel()}</h2>
+					<span class="text-xs text-[var(--color-text-muted)]">{n} entries</span>
+				</div>
+				<div class="w-full overflow-hidden">
+					<svg viewBox="0 0 {W} {H}" class="w-full" style="height: 180px;" preserveAspectRatio="none">
+						<!-- Grid lines + Y labels -->
+						{#each [0, 0.25, 0.5, 0.75, 1] as frac}
+							{@const y = padT + (1 - frac) * plotH}
+							{@const val = minV + frac * vRange}
+							<line x1={padL} y1={y} x2={W - padR} y2={y} stroke="var(--color-surface-hover)" stroke-width="0.7" />
+							<text x={padL - 3} y={y + 3.5} text-anchor="end" font-size="8" fill="var(--color-text-muted)">{val.toFixed(1)}</text>
+						{/each}
+
+						<!-- Data line -->
+						<polyline
+							points={cd.map((p, i) => {
+								const x = padL + (n === 1 ? plotW / 2 : (i / (n - 1)) * plotW);
+								const y = padT + (1 - (p.value - minV) / vRange) * plotH;
+								return `${x.toFixed(1)},${y.toFixed(1)}`;
+							}).join(' ')}
+							fill="none"
+							stroke="var(--color-primary)"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						/>
+
+						<!-- Data dots -->
+						{#each cd as p, i}
+							{@const x = padL + (n === 1 ? plotW / 2 : (i / (n - 1)) * plotW)}
+							{@const y = padT + (1 - (p.value - minV) / vRange) * plotH}
+							<circle cx={x} cy={y} r={n > 30 ? 1.5 : 3} fill="var(--color-primary)" />
+						{/each}
+
+						<!-- X-axis date labels -->
+						<text x={padL} y={H - 6} font-size="8" fill="var(--color-text-muted)" text-anchor="start">{formatDate(cd[0].date)}</text>
+						<text x={W - padR} y={H - 6} font-size="8" fill="var(--color-text-muted)" text-anchor="end">{formatDate(cd[n - 1].date)}</text>
+
+						<!-- Y-axis unit label -->
+						<text x="4" y={padT + plotH / 2} font-size="7" fill="var(--color-text-muted)" text-anchor="middle" transform="rotate(-90, 4, {padT + plotH / 2})">{chartUnit()}</text>
+					</svg>
+				</div>
+				<div class="flex justify-between text-xs text-[var(--color-text-muted)] mt-1 px-1">
+					<span>Min: {minV.toFixed(1)} {chartUnit()}</span>
+					<span>Max: {maxV.toFixed(1)} {chartUnit()}</span>
+				</div>
+			</section>
+		{:else if cd.length === 1}
+			<div class="card text-center py-6 text-[var(--color-text-muted)]">
+				<p>Only 1 data point — log more entries to see a chart.</p>
+			</div>
+		{:else}
+			<div class="card text-center py-6 text-[var(--color-text-muted)]">
+				<p>No data for this metric in the selected time range.</p>
+			</div>
+		{/if}
 	{/if}
-	
+
 	<!-- Floating action button -->
 	<button
 		onclick={() => {
@@ -1003,31 +1209,48 @@
 	<div class="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
 		<div class="bg-[var(--color-surface)] w-full max-w-lg rounded-t-2xl sm:rounded-2xl max-h-[85vh] flex flex-col">
 			<div class="p-4 border-b border-[var(--color-surface-hover)] flex items-center justify-between">
-				<h3 class="text-lg font-semibold">Weight History</h3>
+				<h3 class="text-lg font-semibold">History</h3>
 				<button onclick={() => showHistoryModal = false} class="text-2xl">×</button>
 			</div>
-			
+
+			<!-- Metric selector -->
+			<div class="px-4 pt-3 pb-2 border-b border-[var(--color-surface-hover)]">
+				<select
+					bind:value={historyMetric}
+					class="input text-sm"
+				>
+					<option value="weight">⚖️ Weight</option>
+					{#each data.measureTypes as type}
+						<option value="measure_{type.id}">{type.icon || '📏'} {type.name}</option>
+					{/each}
+					{#if data.compositionHistory.some(c => c.bodyFatPercent != null)}
+						<option value="body_fat">🔬 Body Fat %</option>
+					{/if}
+					{#if data.compositionHistory.some(c => c.muscleMassKg != null)}
+						<option value="muscle_mass">💪 Muscle Mass</option>
+					{/if}
+				</select>
+			</div>
+
 			<div class="p-4 space-y-2 overflow-y-auto flex-1">
-				{#if data.weights.length > 0}
-					{#each data.weights as entry}
+				{#if historyEntries().length > 0}
+					{#each historyEntries() as entry}
 						<div class="flex items-center justify-between py-2 border-b border-[var(--color-surface-hover)] last:border-0">
 							<div>
-								<div class="font-medium">{formatWeight(entry.weight)}</div>
+								<div class="font-medium">{entry.label}</div>
 								<div class="text-sm text-[var(--color-text-muted)]">
-									{new Date(entry.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-									{#if entry.condition}
-										• {entry.condition}
+									{new Date(entry.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+									{#if entry.sublabel}
+										{#if entry.sublabel.length > 0}
+											• {entry.sublabel}
+										{/if}
 									{/if}
 								</div>
 							</div>
-							<form method="POST" action="?/deleteWeight" use:enhance>
-								<input type="hidden" name="weightId" value={entry.id} />
-								<button type="submit" class="text-red-400 hover:text-red-300 text-sm">×</button>
-							</form>
 						</div>
 					{/each}
 				{:else}
-					<p class="text-center text-[var(--color-text-muted)] py-8">No weight entries yet</p>
+					<p class="text-center text-[var(--color-text-muted)] py-8">No entries yet</p>
 				{/if}
 			</div>
 		</div>

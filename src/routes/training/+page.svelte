@@ -88,6 +88,84 @@
 		draftTemplateTargetRepsMax = 12;
 		draftTemplateExercises = [];
 	}
+
+	// Split folder state
+	let newSplitName = $state('');
+	let newSplitColor = $state('#6366f1');
+	let collapsedSplits = $state<Set<number>>(new Set());
+
+	function toggleSplitCollapse(splitId: number) {
+		const next = new Set(collapsedSplits);
+		if (next.has(splitId)) next.delete(splitId);
+		else next.add(splitId);
+		collapsedSplits = next;
+	}
+
+	const standaloneTemplates = $derived(() => data.templates.filter((t: any) => !t.splitId));
+	const splitsWithTemplates = $derived(() =>
+		data.splits.map((s: any) => ({
+			...s,
+			templates: data.templates.filter((t: any) => t.splitId === s.id)
+		}))
+	);
+
+	// T2: Template exercise picker modal
+	let showTemplatePicker = $state(false);
+
+	// Group COMPLETED sets by exercise for the active workout
+	const exercisesInWorkout = $derived(() => {
+		if (!data.activeWorkout) return [];
+
+		const grouped = new Map<
+			number,
+			{
+				exercise: typeof data.allExercises[0];
+				sets: typeof data.activeWorkout.sets;
+			}
+		>();
+
+		for (const set of data.activeWorkout.sets.filter((s) => s.isCompleted)) {
+			if (!grouped.has(set.exerciseId)) {
+				grouped.set(set.exerciseId, {
+					exercise: set.exercise,
+					sets: []
+				});
+			}
+			grouped.get(set.exerciseId)!.sets.push(set);
+		}
+
+		return Array.from(grouped.values());
+	});
+
+	// T2: Live workout exercise order (client-side reorder)
+	let exerciseOrderIds = $state<number[]>([]);
+	$effect(() => {
+		// Sync when exercises change (new exercise added)
+		const ids = exercisesInWorkout().map((g: any) => g.exercise.id);
+		// Only reset if exercises were added/removed (not just on every render)
+		const current = new Set(exerciseOrderIds);
+		const incoming = new Set(ids);
+		const changed = ids.some((id: number) => !current.has(id)) || exerciseOrderIds.some(id => !incoming.has(id));
+		if (changed) exerciseOrderIds = ids;
+	});
+	const orderedExercisesInWorkout = $derived(() => {
+		const groups = exercisesInWorkout();
+		if (exerciseOrderIds.length === 0) return groups;
+		const map = new Map(groups.map((g: any) => [g.exercise.id, g]));
+		const ordered = exerciseOrderIds.filter(id => map.has(id)).map(id => map.get(id)!);
+		// Append any not yet in the override list
+		const extra = groups.filter((g: any) => !exerciseOrderIds.includes(g.exercise.id));
+		return [...ordered, ...extra];
+	});
+	function moveExercise(exerciseId: number, dir: -1 | 1) {
+		const idx = exerciseOrderIds.indexOf(exerciseId);
+		if (idx < 0) return;
+		const j = idx + dir;
+		if (j < 0 || j >= exerciseOrderIds.length) return;
+		const copy = [...exerciseOrderIds];
+		[copy[idx], copy[j]] = [copy[j], copy[idx]];
+		exerciseOrderIds = copy;
+	}
 	let newPRs = $state<Array<{
 		exerciseId: number;
 		exerciseName: string;
@@ -158,31 +236,6 @@
 		createExCategory = entry.category ?? 'other';
 		createExEquipment = entry.equipment ?? 'other';
 	}
-	
-	// Group COMPLETED sets by exercise for the active workout
-	const exercisesInWorkout = $derived(() => {
-		if (!data.activeWorkout) return [];
-
-		const grouped = new Map<
-			number,
-			{
-				exercise: typeof data.allExercises[0];
-				sets: typeof data.activeWorkout.sets;
-			}
-		>();
-
-		for (const set of data.activeWorkout.sets.filter((s) => s.isCompleted)) {
-			if (!grouped.has(set.exerciseId)) {
-				grouped.set(set.exerciseId, {
-					exercise: set.exercise,
-					sets: []
-				});
-			}
-			grouped.get(set.exerciseId)!.sets.push(set);
-		}
-
-		return Array.from(grouped.values());
-	});
 	
 	// Weekly view data
 	const weekDays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -325,10 +378,17 @@
 		
 		<!-- Logged Exercises -->
 		<section class="space-y-4">
-			{#each exercisesInWorkout() as { exercise, sets }}
+			{#each orderedExercisesInWorkout() as { exercise, sets }, exIdx}
 				<div class="card">
 					<div class="flex items-center justify-between mb-3">
-						<h3 class="font-semibold">{exercise.name}</h3>
+						<div class="flex items-center gap-2">
+							<!-- Exercise reorder arrows -->
+							<div class="flex flex-col gap-0.5">
+								<button type="button" onclick={() => moveExercise(exercise.id, -1)} disabled={exIdx === 0} class="text-[var(--color-text-muted)] hover:text-[var(--color-text)] disabled:opacity-20 leading-none text-xs">▲</button>
+								<button type="button" onclick={() => moveExercise(exercise.id, 1)} disabled={exIdx === orderedExercisesInWorkout().length - 1} class="text-[var(--color-text-muted)] hover:text-[var(--color-text)] disabled:opacity-20 leading-none text-xs">▼</button>
+							</div>
+							<h3 class="font-semibold">{exercise.name}</h3>
+						</div>
 						<form method="POST" action="?/removeExerciseFromWorkout" use:enhance>
 							<input type="hidden" name="workoutId" value={data.activeWorkout.id} />
 							<input type="hidden" name="exerciseId" value={exercise.id} />
@@ -338,33 +398,33 @@
 					<div class="space-y-2">
 						{#each sets as set, i}
 							{@const isEditing = editingSetId === set.id}
-							<div class="flex items-center gap-3 text-sm py-2 border-b border-[var(--color-surface-hover)] last:border-0">
-								<span class="w-8 text-[var(--color-text-muted)]">#{i + 1}</span>
-								<span class="px-2 py-0.5 rounded text-xs bg-[var(--color-bg)]">
-									{set.setType}
-								</span>
+							<div class="flex items-center gap-2 text-sm py-2 border-b border-[var(--color-surface-hover)] last:border-0">
+								<span class="w-6 text-[var(--color-text-muted)] text-xs">#{i + 1}</span>
 								{#if isEditing}
-									<form method="POST" action="?/updateSet" use:enhance={() => { return async ({ update }) => { editingSetId = null; await update(); }; }} class="flex-1 flex items-center gap-2">
+									<form method="POST" action="?/updateSet" use:enhance={() => { return async ({ update }) => { editingSetId = null; await update(); }; }} class="flex-1 flex items-center gap-1.5 flex-wrap">
 										<input type="hidden" name="setId" value={set.id} />
+										<select name="setType" class="input text-xs py-0.5 px-1 h-auto" value={set.setType ?? 'working'}>
+											<option value="warmup">Warmup</option>
+											<option value="working">Working</option>
+											<option value="dropset">Dropset</option>
+											<option value="failure">Failure</option>
+										</select>
 										<input type="number" name="weight" value={set.weight ?? ''} step="0.5" placeholder={weightUnit()} class="w-16 px-2 py-1 rounded bg-[var(--color-bg)] border border-[var(--color-surface-hover)] text-sm" />
 										<span>×</span>
 										<input type="number" name="reps" value={set.reps ?? ''} placeholder="reps" class="w-14 px-2 py-1 rounded bg-[var(--color-bg)] border border-[var(--color-surface-hover)] text-sm" />
-										<!-- RPE removed -->
 										<button type="submit" class="text-green-400 hover:text-green-300 text-lg">✓</button>
 										<button type="button" onclick={() => editingSetId = null} class="text-[var(--color-text-muted)] hover:text-[var(--color-text)]">✕</button>
 									</form>
 								{:else}
+									<span class="px-1.5 py-0.5 rounded text-xs bg-[var(--color-bg)] text-[var(--color-text-muted)]">{set.setType ?? 'working'}</span>
 									<button type="button" onclick={() => editingSetId = set.id} class="flex-1 text-left hover:text-[var(--color-primary)] transition-colors" title="Tap to edit">
 										{set.weight ?? '—'} {weightUnit()} × {set.reps ?? '—'}
-										<!-- RPE removed -->
 									</button>
 								{/if}
 								<form method="POST" action="?/deleteSet" use:enhance>
 									<input type="hidden" name="setId" value={set.id} />
 									<button type="submit" class="text-red-400 hover:text-red-300">×</button>
 								</form>
-
-								<!-- Quick add a new placeholder set for this exercise -->
 								<form method="POST" action="?/addPlaceholderSet" use:enhance>
 									<input type="hidden" name="workoutId" value={data.activeWorkout.id} />
 									<input type="hidden" name="exerciseId" value={exercise.id} />
@@ -755,82 +815,92 @@
 					exercises={data.allExercises}
 					catalogEntries={((data as any).exerciseCatalogEntries ?? [])}
 					historyHrefForExerciseId={(id: number) => `/training/exercise/${id}`}
-					on:selectExercise={(e) => selectExercise(e.detail as any)}
-					on:prefillFromCatalog={(e) => prefillCreateExerciseFromCatalog(e.detail)}
-					on:createCustomRequested={() => (showCreateExercise = true)}
+					onselectExercise={(ex) => selectExercise(ex as any)}
+					onprefillFromCatalog={(entry) => prefillCreateExerciseFromCatalog(entry)}
+					oncreateCustomRequested={() => (showCreateExercise = true)}
 				/>
 
-				<!-- Create custom exercise -->
-				{#if showCreateExercise}
-					<form
-						method="POST"
-						action="?/createExercise"
-						use:enhance={() => {
-							return async ({ update }) => {
-								await update();
-								showCreateExercise = false;
-								createExName = '';
-								createExCategory = 'other';
-								createExEquipment = 'other';
-								createRestWarmup = 60;
-								createRestWorking = 120;
-								createRestDropset = 30;
-								createRestFailure = 180;
-							};
-						}}
-						class="mt-3 p-3 rounded-lg bg-[var(--color-bg)] space-y-2"
-					>
-						<div>
-							<input type="text" name="name" bind:value={createExName} class="input text-sm" placeholder="Exercise name" required />
-						</div>
-						<div class="grid grid-cols-2 gap-2">
-							<select name="category" bind:value={createExCategory} class="input text-sm">
-								<option value="chest">Chest</option>
-								<option value="back">Back</option>
-								<option value="shoulders">Shoulders</option>
-								<option value="arms">Arms</option>
-								<option value="legs">Legs</option>
-								<option value="core">Core</option>
-								<option value="cardio">Cardio</option>
-								<option value="other">Other</option>
-							</select>
-							<select name="equipment" bind:value={createExEquipment} class="input text-sm">
-								<option value="barbell">Barbell</option>
-								<option value="dumbbell">Dumbbell</option>
-								<option value="cable">Cable</option>
-								<option value="machine">Machine</option>
-								<option value="bodyweight">Bodyweight</option>
-								<option value="other">Other</option>
-							</select>
-						</div>
-						<div>
-							<div class="text-xs text-[var(--color-text-muted)] mb-2">⏱️ Rest timers (seconds)</div>
-							<div class="grid grid-cols-2 gap-2">
-								<label class="text-xs text-[var(--color-text-muted)]">
-									Warmup
-									<input type="number" name="restWarmup" bind:value={createRestWarmup} min="0" step="5" class="input text-sm mt-1" />
-								</label>
-								<label class="text-xs text-[var(--color-text-muted)]">
-									Working
-									<input type="number" name="restWorking" bind:value={createRestWorking} min="0" step="5" class="input text-sm mt-1" />
-								</label>
-								<label class="text-xs text-[var(--color-text-muted)]">
-									Dropset
-									<input type="number" name="restDropset" bind:value={createRestDropset} min="0" step="5" class="input text-sm mt-1" />
-								</label>
-								<label class="text-xs text-[var(--color-text-muted)]">
-									Failure
-									<input type="number" name="restFailure" bind:value={createRestFailure} min="0" step="5" class="input text-sm mt-1" />
-								</label>
-							</div>
-						</div>
-						<div class="flex gap-2">
-							<button type="submit" class="btn btn-primary flex-1 text-sm">Add</button>
-							<button type="button" onclick={() => showCreateExercise = false} class="btn btn-secondary flex-1 text-sm">Cancel</button>
-						</div>
-					</form>
-				{/if}
 			</div>
+		</div>
+	</div>
+{/if}
+
+
+<!-- Create Custom Exercise Modal -->
+{#if showCreateExercise}
+	<div class="fixed inset-0 bg-black/50 z-[70] flex items-end sm:items-center justify-center">
+		<div class="bg-[var(--color-surface)] w-full max-w-lg rounded-t-2xl sm:rounded-2xl">
+			<div class="p-4 border-b border-[var(--color-surface-hover)] flex items-center justify-between">
+				<h3 class="text-lg font-semibold">Create Custom Exercise</h3>
+				<button type="button" onclick={() => showCreateExercise = false} class="text-2xl">×</button>
+			</div>
+			<form
+				method="POST"
+				action="?/createExercise"
+				use:enhance={() => {
+					return async ({ update }) => {
+						await update();
+						showCreateExercise = false;
+						createExName = '';
+						createExCategory = 'other';
+						createExEquipment = 'other';
+						createRestWarmup = 60;
+						createRestWorking = 120;
+						createRestDropset = 30;
+						createRestFailure = 180;
+					};
+				}}
+				class="p-4 space-y-3"
+			>
+				<div>
+					<input type="text" name="name" bind:value={createExName} class="input text-sm" placeholder="Exercise name" required />
+				</div>
+				<div class="grid grid-cols-2 gap-2">
+					<select name="category" bind:value={createExCategory} class="input text-sm">
+						<option value="chest">Chest</option>
+						<option value="back">Back</option>
+						<option value="shoulders">Shoulders</option>
+						<option value="arms">Arms</option>
+						<option value="legs">Legs</option>
+						<option value="core">Core</option>
+						<option value="cardio">Cardio</option>
+						<option value="other">Other</option>
+					</select>
+					<select name="equipment" bind:value={createExEquipment} class="input text-sm">
+						<option value="barbell">Barbell</option>
+						<option value="dumbbell">Dumbbell</option>
+						<option value="cable">Cable</option>
+						<option value="machine">Machine</option>
+						<option value="bodyweight">Bodyweight</option>
+						<option value="other">Other</option>
+					</select>
+				</div>
+				<div>
+					<div class="text-xs text-[var(--color-text-muted)] mb-2">⏱️ Rest timers (seconds)</div>
+					<div class="grid grid-cols-2 gap-2">
+						<label class="text-xs text-[var(--color-text-muted)]">
+							Warmup
+							<input type="number" name="restWarmup" bind:value={createRestWarmup} min="0" step="5" class="input text-sm mt-1" />
+						</label>
+						<label class="text-xs text-[var(--color-text-muted)]">
+							Working
+							<input type="number" name="restWorking" bind:value={createRestWorking} min="0" step="5" class="input text-sm mt-1" />
+						</label>
+						<label class="text-xs text-[var(--color-text-muted)]">
+							Dropset
+							<input type="number" name="restDropset" bind:value={createRestDropset} min="0" step="5" class="input text-sm mt-1" />
+						</label>
+						<label class="text-xs text-[var(--color-text-muted)]">
+							Failure
+							<input type="number" name="restFailure" bind:value={createRestFailure} min="0" step="5" class="input text-sm mt-1" />
+						</label>
+					</div>
+				</div>
+				<div class="flex gap-2">
+					<button type="submit" class="btn btn-primary flex-1 text-sm">Add</button>
+					<button type="button" onclick={() => showCreateExercise = false} class="btn btn-secondary flex-1 text-sm">Cancel</button>
+				</div>
+			</form>
 		</div>
 	</div>
 {/if}
@@ -939,22 +1009,90 @@
 			</div>
 			
 			<div class="flex-1 overflow-y-auto p-4 space-y-4">
-				{#each data.templates as template}
+				<!-- Split folders -->
+				{#each splitsWithTemplates() as split}
+					<div class="rounded-xl border border-[var(--color-surface-hover)] overflow-hidden">
+						<!-- Split header -->
+						<div class="flex items-center gap-2 px-3 py-2 bg-[var(--color-surface-hover)]">
+							<div class="w-3 h-3 rounded-full flex-shrink-0" style="background:{split.color ?? '#6366f1'}"></div>
+							<button
+								type="button"
+								class="flex-1 text-left font-semibold text-sm"
+								onclick={() => toggleSplitCollapse(split.id)}
+							>
+								{split.name}
+								<span class="text-[var(--color-text-muted)] font-normal ml-1">({split.templates.length})</span>
+							</button>
+							<span class="text-xs text-[var(--color-text-muted)]">{collapsedSplits.has(split.id) ? '▸' : '▾'}</span>
+							<form method="POST" action="?/deleteSplit" use:enhance>
+								<input type="hidden" name="splitId" value={split.id} />
+								<button
+									type="submit"
+									class="text-red-400 hover:text-red-300 text-xs ml-1"
+									onclick={(e) => { if (!confirm('Delete this split folder? Templates will become standalone.')) e.preventDefault(); }}
+								>Delete</button>
+							</form>
+						</div>
+						<!-- Split templates -->
+						{#if !collapsedSplits.has(split.id)}
+							<div class="divide-y divide-[var(--color-surface-hover)]">
+								{#each split.templates as template}
+									<div class="px-3 py-2">
+										<div class="flex items-center justify-between">
+											<span class="font-medium text-sm">{template.name}</span>
+											<div class="flex items-center gap-2">
+												<form method="POST" action="?/assignTemplateToSplit" use:enhance>
+													<input type="hidden" name="templateId" value={template.id} />
+													<input type="hidden" name="splitId" value="" />
+													<button type="submit" class="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text)]">Detach</button>
+												</form>
+												<form method="POST" action="?/deleteTemplate" use:enhance>
+													<input type="hidden" name="templateId" value={template.id} />
+													<button type="submit" class="text-red-400 hover:text-red-300 text-xs" onclick={(e) => { if (!confirm('Delete this template?')) e.preventDefault(); }}>Delete</button>
+												</form>
+											</div>
+										</div>
+										{#if template.exercises.length > 0}
+											<p class="text-xs text-[var(--color-text-muted)] mt-0.5">
+												{template.exercises.map((te: any) => te.exercise.name).join(', ')}
+											</p>
+										{/if}
+									</div>
+								{:else}
+									<p class="px-3 py-2 text-sm text-[var(--color-text-muted)]">No templates in this split</p>
+								{/each}
+							</div>
+						{/if}
+					</div>
+				{/each}
+
+				<!-- Standalone templates -->
+				{#each standaloneTemplates() as template}
 					<div class="card">
 						<div class="flex items-center justify-between mb-2">
 							<h4 class="font-semibold">{template.name}</h4>
-							<form method="POST" action="?/deleteTemplate" use:enhance>
-								<input type="hidden" name="templateId" value={template.id} />
-								<button 
-									type="submit" 
-									class="text-red-400 hover:text-red-300 text-sm"
-									onclick={(e) => {
-										if (!confirm('Delete this template?')) e.preventDefault();
-									}}
-								>
-									Delete
-								</button>
-							</form>
+							<div class="flex items-center gap-2">
+								{#if data.splits.length > 0}
+									<form method="POST" action="?/assignTemplateToSplit" use:enhance class="flex items-center gap-1">
+										<input type="hidden" name="templateId" value={template.id} />
+										<select name="splitId" class="input text-xs py-0.5 px-1 h-auto">
+											<option value="">Move to split…</option>
+											{#each data.splits as s}
+												<option value={s.id}>{s.name}</option>
+											{/each}
+										</select>
+										<button type="submit" class="btn btn-secondary text-xs py-0.5">Go</button>
+									</form>
+								{/if}
+								<form method="POST" action="?/deleteTemplate" use:enhance>
+									<input type="hidden" name="templateId" value={template.id} />
+									<button
+										type="submit"
+										class="text-red-400 hover:text-red-300 text-sm"
+										onclick={(e) => { if (!confirm('Delete this template?')) e.preventDefault(); }}
+									>Delete</button>
+								</form>
+							</div>
 						</div>
 						{#if template.exercises.length > 0}
 							<ul class="text-sm text-[var(--color-text-muted)] space-y-1">
@@ -967,6 +1105,27 @@
 						{/if}
 					</div>
 				{/each}
+
+				<!-- New split folder form -->
+				<form
+					method="POST"
+					action="?/createSplit"
+					use:enhance={() => {
+						return async ({ update }) => {
+							newSplitName = '';
+							newSplitColor = '#6366f1';
+							await update();
+						};
+					}}
+					class="card space-y-2"
+				>
+					<h4 class="font-semibold text-sm">New Split Folder</h4>
+					<div class="flex items-center gap-2">
+						<input type="text" name="name" bind:value={newSplitName} placeholder="e.g. PPL Split" required class="input flex-1 text-sm" />
+						<input type="color" name="color" bind:value={newSplitColor} class="w-8 h-8 rounded cursor-pointer" title="Folder color" />
+						<button type="submit" class="btn btn-secondary text-sm">Create</button>
+					</div>
+				</form>
 				
 				<form
 					method="POST"
@@ -1005,33 +1164,12 @@
 					<input type="text" name="name" placeholder="Template name" required class="input" />
 
 					<div class="p-3 rounded-lg bg-[var(--color-bg)] space-y-2">
-						<div class="text-sm font-semibold">Build exercises</div>
-						<div class="grid grid-cols-2 gap-2">
-							<select class="input" bind:value={draftTemplateExerciseId}>
-								<option value={null}>Select exercise…</option>
-								{#each data.allExercises as ex (ex.id)}
-									<option value={ex.id}>{ex.name}</option>
-								{/each}
-							</select>
-							<button type="button" class="btn btn-secondary" onclick={addDraftExercise}>
-								Add
+						<div class="flex items-center justify-between">
+							<div class="text-sm font-semibold">Build exercises</div>
+							<button type="button" class="btn btn-secondary text-sm" onclick={() => showTemplatePicker = true}>
+								Add Exercise →
 							</button>
 						</div>
-						<div class="grid grid-cols-3 gap-2">
-							<label class="text-xs text-[var(--color-text-muted)]">
-								Sets
-								<input type="number" class="input text-sm mt-1" min="1" bind:value={draftTemplateTargetSets} />
-							</label>
-							<label class="text-xs text-[var(--color-text-muted)]">
-								Reps min
-								<input type="number" class="input text-sm mt-1" min="1" bind:value={draftTemplateTargetRepsMin} />
-							</label>
-							<label class="text-xs text-[var(--color-text-muted)]">
-								Reps max
-								<input type="number" class="input text-sm mt-1" min="1" bind:value={draftTemplateTargetRepsMax} />
-							</label>
-						</div>
-
 						{#if draftTemplateExercises.length > 0}
 							<div class="space-y-2 pt-2">
 								{#each draftTemplateExercises as e, idx (e.exerciseId)}
@@ -1054,6 +1192,48 @@
 
 					<button type="submit" class="btn btn-primary w-full">Create template</button>
 				</form>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Template Exercise Picker Modal (for New Template builder) -->
+{#if showTemplatePicker}
+	<div class="fixed inset-0 bg-black/50 z-[60] flex items-end sm:items-center justify-center">
+		<div class="bg-[var(--color-surface)] w-full max-w-lg rounded-t-2xl sm:rounded-2xl max-h-[85vh] flex flex-col">
+			<div class="p-4 border-b border-[var(--color-surface-hover)] flex items-center justify-between">
+				<h3 class="text-lg font-semibold">Add Exercise to Template</h3>
+				<button onclick={() => showTemplatePicker = false} class="text-2xl">×</button>
+			</div>
+			<div class="px-4 pt-3 pb-2 space-y-2 border-b border-[var(--color-surface-hover)]">
+				<div class="grid grid-cols-3 gap-2">
+					<label class="text-xs text-[var(--color-text-muted)]">
+						Sets
+						<input type="number" class="input text-sm mt-1" min="1" bind:value={draftTemplateTargetSets} />
+					</label>
+					<label class="text-xs text-[var(--color-text-muted)]">
+						Reps min
+						<input type="number" class="input text-sm mt-1" min="1" bind:value={draftTemplateTargetRepsMin} />
+					</label>
+					<label class="text-xs text-[var(--color-text-muted)]">
+						Reps max
+						<input type="number" class="input text-sm mt-1" min="1" bind:value={draftTemplateTargetRepsMax} />
+					</label>
+				</div>
+			</div>
+			<div class="flex-1 overflow-y-auto p-4">
+				<ExerciseSearch
+					exercises={data.allExercises}
+					catalogEntries={((data as any).exerciseCatalogEntries ?? [])}
+					historyHrefForExerciseId={(id: number) => `/training/exercise/${id}`}
+					onselectExercise={(ex) => {
+						draftTemplateExerciseId = (ex as any).id;
+						addDraftExercise();
+						showTemplatePicker = false;
+					}}
+					onprefillFromCatalog={(entry) => prefillCreateExerciseFromCatalog(entry)}
+					oncreateCustomRequested={() => { showCreateExercise = true; showTemplatePicker = false; }}
+				/>
 			</div>
 		</div>
 	</div>

@@ -36,6 +36,13 @@
       "when": 1770941071722,
       "tag": "0004_volatile_champions",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1773430700919,
+      "tag": "0005_naive_the_call",
+      "breakpoints": true
     }
   ]
 }

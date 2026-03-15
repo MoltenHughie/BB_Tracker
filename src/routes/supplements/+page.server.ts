@@ -287,12 +287,13 @@ export const actions: Actions = {
 		const servingSize = data.get('servingSize') as string || null;
 		const concentration = data.get('concentration') as string || null;
 		const isPed = data.get('isPed') === 'true';
-		const isRx = data.get('isRx') === 'true';
 		const notes = data.get('notes') as string || null;
 		const calories = data.get('calories') ? parseFloat(data.get('calories') as string) : null;
 		const protein = data.get('protein') ? parseFloat(data.get('protein') as string) : null;
 		const carbs = data.get('carbs') ? parseFloat(data.get('carbs') as string) : null;
 		const fat = data.get('fat') ? parseFloat(data.get('fat') as string) : null;
+		const nutrientsRaw = data.get('nutrients') as string || null;
+		const nutrients = nutrientsRaw || null;
 
 		if (!name) {
 			return fail(400, { error: 'Name is required' });
@@ -308,12 +309,12 @@ export const actions: Actions = {
 			servingSize,
 			concentration,
 			isPed,
-			isRx,
 			notes,
 			calories,
 			protein,
 			carbs,
 			fat,
+			nutrients,
 			createdAt: now,
 			updatedAt: now
 		}).returning({ id: supplements.id });
@@ -332,12 +333,13 @@ export const actions: Actions = {
 		const servingSize = data.get('servingSize') as string || null;
 		const concentration = data.get('concentration') as string || null;
 		const isPed = data.get('isPed') === 'true';
-		const isRx = data.get('isRx') === 'true';
 		const notes = data.get('notes') as string || null;
 		const calories = data.get('calories') ? parseFloat(data.get('calories') as string) : null;
 		const protein = data.get('protein') ? parseFloat(data.get('protein') as string) : null;
 		const carbs = data.get('carbs') ? parseFloat(data.get('carbs') as string) : null;
 		const fat = data.get('fat') ? parseFloat(data.get('fat') as string) : null;
+		const nutrientsRaw = data.get('nutrients') as string || null;
+		const nutrients = nutrientsRaw || null;
 
 		if (!supplementId || isNaN(supplementId)) {
 			return fail(400, { error: 'Supplement ID is required' });
@@ -358,12 +360,12 @@ export const actions: Actions = {
 				servingSize,
 				concentration,
 				isPed,
-				isRx,
 				notes,
 				calories,
 				protein,
 				carbs,
 				fat,
+				nutrients,
 				updatedAt: now
 			})
 			.where(eq(supplements.id, supplementId));
